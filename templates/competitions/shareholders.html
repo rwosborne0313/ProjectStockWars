@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Shareholders | StockWars{% endblock %}
+
+{% block content %}
+  <div class="p-4 p-md-5 rounded-4 border text-bg-dark mb-4">
+    <div class="text-uppercase small text-muted mb-2">Shareholders</div>
+    <h1 class="display-6 fw-bold mb-2">Invest in the future of StockWars</h1>
+    <p class="lead mb-0 text-white-50">
+      StockWars is building an exciting, competition-first trading simulator experience. If you’re exploring an
+      investment, we’d love to share our story, traction, and roadmap.
+    </p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <span class="badge text-bg-success">Rewarding</span>
+            <span class="badge text-bg-warning">Exciting</span>
+            <span class="badge text-bg-info">Education-first</span>
+            <span class="badge text-bg-secondary">Sponsor-supported</span>
+          </div>
+
+          <h2 class="h5 fw-semibold">Why StockWars</h2>
+          <p class="text-muted">
+            We believe market education can be more engaging when it’s competitive, measurable, and safe. StockWars
+            combines simulated trading, weekly competitions, and sponsor-backed prize pools to create an experience that
+            users return to—and talk about.
+          </p>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="p-3 rounded-3 bg-body-tertiary">
+                <div class="fw-semibold mb-1">A product users want</div>
+                <div class="text-muted small">
+                  A fun, secure environment to practice decision-making without real-money risk.
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="p-3 rounded-3 bg-body-tertiary">
+                <div class="fw-semibold mb-1">A model sponsors understand</div>
+                <div class="text-muted small">
+                  Sponsored competitions create a strong marketing loop: engagement, visibility, and prizes.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <h2 class="h5 fw-semibold">Interested in investing?</h2>
+          <p class="text-muted mb-0">
+            Investing in StockWars can be rewarding and exciting as we expand competitions, sponsorships, and
+            investor-focused features. Contact us to learn more and request an investor overview.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <div class="text-uppercase small text-muted mb-2">Investor relations</div>
+          <div class="h5 fw-semibold mb-2">Let’s talk</div>
+          <div class="text-muted mb-3">
+            For official investor communications and to learn more about StockWars, reach out below.
+          </div>
+
+          <div class="d-grid gap-2">
+            <a class="btn btn-primary" href="mailto:ir@stockwars.example">Email Investor Relations</a>
+            <a class="btn btn-outline-secondary" href="{% url 'competitions:contact' %}">Contact page</a>
+          </div>
+
+          <div class="small text-muted mt-3">
+            Email: <a href="mailto:ir@stockwars.example">ir@stockwars.example</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

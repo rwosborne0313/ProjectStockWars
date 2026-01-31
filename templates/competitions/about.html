@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}About Us | StockWars{% endblock %}
+
+{% block content %}
+  <div class="p-4 p-md-5 rounded-4 border text-bg-dark mb-4">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-7">
+        <div class="text-uppercase small text-white-50 mb-2">About</div>
+        <h1 class="display-6 fw-bold mb-2">Built by traders. Designed for competitors.</h1>
+        <p class="lead mb-3">
+          StockWars was founded by experienced day traders, investors, and investment professionals who are passionate
+          about empowering investors in ways that are <span class="fw-semibold">fun</span>, <span class="fw-semibold">safe</span>,
+          <span class="fw-semibold">secure</span>, and <span class="fw-semibold">educational</span>—with a chance to earn
+          <span class="fw-semibold">large winnings</span> in sponsored competitions.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-primary btn-lg" href="{% url 'competitions:current_competitions' %}">Explore competitions</a>
+          <a class="btn btn-outline-light btn-lg" href="{% url 'accounts:signup' %}">Create your account</a>
+        </div>
+        <div class="mt-3 d-flex flex-wrap gap-2">
+          <span class="badge text-bg-success">Simulated</span>
+          <span class="badge text-bg-info">Skill-based</span>
+          <span class="badge text-bg-warning">Sponsored prizes</span>
+          <span class="badge text-bg-secondary">Secure by design</span>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="p-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-25">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-semibold">Our mission</div>
+            <span class="badge text-bg-primary">StockWars</span>
+          </div>
+          <div class="text-white-50">
+            Make learning markets addictive—in the best way—by combining strategy, competition, and real-time feedback
+            without real-money risk.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="row g-4">
+        <div class="col-12">
+          <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                <div>
+                  <div class="text-uppercase small text-muted">Why people love StockWars</div>
+                  <div class="h4 mb-0 fw-semibold">A competition-first trading simulator</div>
+                </div>
+                <div class="d-flex gap-2">
+                  <span class="badge rounded-pill text-bg-primary">Fast</span>
+                  <span class="badge rounded-pill text-bg-success">Safe</span>
+                  <span class="badge rounded-pill text-bg-warning">Exciting</span>
+                </div>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <div class="p-3 rounded-3 bg-body-tertiary">
+                    <div class="fw-semibold mb-1">Fun, competitive format</div>
+                    <div class="text-muted small">Weekly competitions that reward strategy—not hype.</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="p-3 rounded-3 bg-body-tertiary">
+                    <div class="fw-semibold mb-1">Safe + secure by design</div>
+                    <div class="text-muted small">Simulated trades, controlled rules, and integrity checks.</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="p-3 rounded-3 bg-body-tertiary">
+                    <div class="fw-semibold mb-1">Learn while you play</div>
+                    <div class="text-muted small">Practice risk management with immediate feedback.</div>
+                  </div>
+                </div>
+              </div>
+
+              <hr class="my-4">
+
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="d-flex gap-3">
+                    <div class="flex-shrink-0">
+                      <span class="badge text-bg-success">Safe</span>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">No real-money trading</div>
+                      <div class="text-muted small">You start with simulated cash and trade in a sandboxed environment.</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="d-flex gap-3">
+                    <div class="flex-shrink-0">
+                      <span class="badge text-bg-warning">Winnings</span>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">Chance to earn large prizes</div>
+                      <div class="text-muted small">Sponsored competitions may offer large cash and/or non-cash prizes.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card shadow-sm">
+            <div class="card-body p-4">
+              <h2 class="h5 fw-semibold mb-2">Our promise</h2>
+              <p class="text-muted mb-0">
+                We’re building StockWars for people who want the thrill of the market with guardrails:
+                education-forward features, clear rules, and a secure experience that rewards disciplined decision-making.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <div class="text-uppercase small text-muted mb-2">Quick links</div>
+          <div class="d-grid gap-2">
+            <a class="btn btn-outline-primary" href="{% url 'competitions:current_competitions' %}">Browse competitions</a>
+            <a class="btn btn-outline-secondary" href="{% url 'competitions:terms' %}">Terms &amp; Privacy</a>
+            <a class="btn btn-outline-secondary" href="{% url 'competitions:contact' %}">Contact</a>
+          </div>
+          <hr class="my-4">
+          <div class="alert alert-info mb-0" role="alert">
+            <div class="fw-semibold mb-1">Pro tip</div>
+            <div class="small">
+              Start with a weekly competition, set a plan, and track your decision-making—not just the outcome.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <div class="row g-3 align-items-center">
+            <div class="col-lg-8">
+              <div class="h5 fw-semibold mb-1">Ready to compete?</div>
+              <div class="text-muted">
+                Join a sponsored competition, place simulated trades, and climb the leaderboard.
+              </div>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+              <a class="btn btn-primary w-100 w-lg-auto" href="{% url 'competitions:current_competitions' %}">Get started</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

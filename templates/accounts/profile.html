@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load tz %}
+
+{% block title %}Profile | StockWars{% endblock %}
+
+{% block content %}
+  <h1 class="h3 mb-3">Profile</h1>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr>
+              <th class="text-muted fw-normal" scope="row" style="width: 220px;">Username</th>
+              <td class="fw-semibold">{{ user.username }}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Email</th>
+              <td>{% if user.email %}{{ user.email }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Account created</th>
+              <td class="text-muted">{{ user.date_joined|localtime }}</td>
+            </tr>
+
+            <tr><td colspan="2" class="py-2"></td></tr>
+
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Display name</th>
+              <td>{% if profile %}<span class="fw-semibold">{{ profile.display_name }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">First name</th>
+              <td>{% if profile and profile.first_name %}{{ profile.first_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Last name</th>
+              <td>{% if profile and profile.last_name %}{{ profile.last_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Age bracket</th>
+              <td>{% if profile %}{{ profile.age_bracket }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Experience</th>
+              <td>{% if profile %}{{ profile.experience_level }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+
+            <tr><td colspan="2" class="py-2"></td></tr>
+
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Address</th>
+              <td>
+                {% if profile and profile.address %}
+                  {{ profile.address }}
+                  {% if profile.address2 %}<div class="text-muted small">{{ profile.address2 }}</div>{% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">City</th>
+              <td>{% if profile and profile.city %}{{ profile.city }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">State</th>
+              <td>{% if profile and profile.state %}{{ profile.state }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Zip Code</th>
+              <td>{% if profile and profile.zip_code %}{{ profile.zip_code }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Phone</th>
+              <td>{% if profile and profile.phone %}{{ profile.phone }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">Date of Birth</th>
+              <td>{% if profile and profile.date_of_birth %}{{ profile.date_of_birth }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            <tr>
+              <th class="text-muted fw-normal" scope="row">SSN</th>
+              <td>
+                {% if profile and profile.ssn %}
+                  <span class="text-muted">***-**-</span><span class="fw-semibold">{{ profile.ssn|slice:"-4:" }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

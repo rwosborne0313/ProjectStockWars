@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% load tz %}
+
+{% block title %}War Stream | StockWars{% endblock %}
+
+{% block content %}
+  <div class="p-4 p-md-5 rounded-4 border bg-body-tertiary mb-4">
+    <div class="text-uppercase small text-muted mb-2">War Stream</div>
+    <h1 class="display-6 fw-semibold mb-2">Streaming Quotes</h1>
+    <p class="text-muted mb-0">
+      Enter symbols (comma-separated) to start a live stream of prices from Twelve Data.
+    </p>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-body-tertiary fw-semibold">Symbols</div>
+    <div class="card-body">
+      <div id="wsAlert" class="alert alert-secondary d-none mb-3" role="alert"></div>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-lg-8">
+          <label class="form-label" for="wsSymbols">Symbols</label>
+          <input
+            id="wsSymbols"
+            class="form-control"
+            placeholder="e.g. AAPL, MSFT, QQQ"
+            autocomplete="off"
+          />
+          <div class="form-text">
+            Tip: symbols should match Twelve Data format (e.g., AAPL, QQQ).
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="d-grid gap-2 d-lg-flex justify-content-lg-end">
+            <button class="btn btn-primary" id="wsConnectBtn" type="button">Connect</button>
+            <button class="btn btn-outline-secondary" id="wsDisconnectBtn" type="button" disabled>Disconnect</button>
+            <button class="btn btn-outline-secondary" id="wsClearBtn" type="button">Clear table</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 small text-muted" id="wsStatus">Disconnected.</div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-body-tertiary fw-semibold">Live feed</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" id="wsTable">
+          <thead>
+            <tr>
+              <th class="ps-3">Symbol</th>
+              <th class="text-end">Price</th>
+              <th class="text-end">Change</th>
+              <th class="text-end">Updated</th>
+              <th class="pe-3"></th>
+            </tr>
+          </thead>
+          <tbody id="wsTbody">
+            <tr id="wsEmptyRow">
+              <td class="ps-3 text-muted" colspan="5">No data yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var statusEl = document.getElementById("wsStatus");
+      var alertEl = document.getElementById("wsAlert");
+      var symbolsEl = document.getElementById("wsSymbols");
+      var connectBtn = document.getElementById("wsConnectBtn");
+      var disconnectBtn = document.getElementById("wsDisconnectBtn");
+      var clearBtn = document.getElementById("wsClearBtn");
+      var tbody = document.getElementById("wsTbody");
+      var emptyRow = document.getElementById("wsEmptyRow");
+
+      if (!statusEl || !symbolsEl || !connectBtn || !disconnectBtn || !clearBtn || !tbody) return;
+
+      var ws = null;
+      var lastPriceBySymbol = {};
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function showAlert(msg, tone) {
+        if (!alertEl) return;
+        alertEl.classList.remove("d-none", "alert-secondary", "alert-success", "alert-warning", "alert-danger");
+        alertEl.classList.add(tone || "alert-secondary");
+        alertEl.textContent = msg;
+      }
+
+      function hideAlert() {
+        if (!alertEl) return;
+        alertEl.classList.add("d-none");
+        alertEl.textContent = "";
+      }
+
+      function normalizeSymbols(raw) {
+        var cryptoDefaultUsd = new Set(["BTC", "ETH", "SOL", "DOGE", "ADA", "XRP", "LTC", "BCH", "AVAX", "DOT"]);
+        return Array.from(
+          new Set(
+            (raw || "")
+              .split(",")
+              .map(function (s) {
+                var sym = (s || "").trim().toUpperCase();
+                if (!sym) return "";
+                // Convenience: allow "BTC" to mean "BTC/USD" for crypto streaming.
+                if (cryptoDefaultUsd.has(sym) && sym.indexOf("/") === -1) {
+                  return sym + "/USD";
+                }
+                return sym;
+              })
+              .filter(Boolean)
+          )
+        );
+      }
+
+      function fmtMoney(n) {
+        if (n === null || n === undefined || Number.isNaN(n)) return "—";
+        return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+      }
+
+      function pad2(n) {
+        return String(n).padStart(2, "0");
+      }
+
+      function formatTimestampMs(ms) {
+        var dt = ms ? new Date(ms) : new Date();
+        // Fixed format to ensure seconds always display: YYYY-MM-DD HH:MM:SS
+        return (
+          dt.getFullYear()
+          + "-" + pad2(dt.getMonth() + 1)
+          + "-" + pad2(dt.getDate())
+          + " " + pad2(dt.getHours())
+          + ":" + pad2(dt.getMinutes())
+          + ":" + pad2(dt.getSeconds())
+        );
+      }
+
+      function ensureRow(symbol) {
+        var id = "ws-row-" + symbol;
+        var row = document.getElementById(id);
+        if (row) return row;
+
+        if (emptyRow) emptyRow.remove();
+
+        row = document.createElement("tr");
+        row.id = id;
+
+        row.innerHTML =
+          '<td class="ps-3 fw-semibold">' + symbol + '</td>' +
+          '<td class="text-end" data-col="price">—</td>' +
+          '<td class="text-end" data-col="change">—</td>' +
+          '<td class="text-end small text-muted" data-col="time">—</td>' +
+          '<td class="text-end pe-3 small text-muted" data-col="src">WS</td>';
+
+        tbody.prepend(row);
+        return row;
+      }
+
+      function setRowTone(row, tone) {
+        row.classList.remove("table-success", "table-danger", "table-dark");
+        if (tone) row.classList.add(tone);
+      }
+
+      function updateRow(symbol, price, ts) {
+        var row = ensureRow(symbol);
+        var prev = lastPriceBySymbol[symbol];
+        lastPriceBySymbol[symbol] = price;
+
+        var tone = null;
+        var change = null;
+        if (prev !== undefined && prev !== null) {
+          change = price - prev;
+          if (change > 0) tone = "table-success";
+          else if (change < 0) tone = "table-danger";
+          else tone = "table-dark";
+        }
+        setRowTone(row, tone);
+
+        var priceEl = row.querySelector("[data-col='price']");
+        var changeEl = row.querySelector("[data-col='change']");
+        var timeEl = row.querySelector("[data-col='time']");
+
+        if (priceEl) priceEl.textContent = fmtMoney(price);
+        if (changeEl) changeEl.textContent = (change === null) ? "—" : fmtMoney(change);
+        if (timeEl) timeEl.textContent = formatTimestampMs(ts || Date.now());
+      }
+
+      function handleUpstream(msg) {
+        if (!msg || msg.type !== "upstream" || !msg.data) return;
+        var data = msg.data;
+        if (!data) return;
+
+        // Show upstream status messages to the user (subscribe-status, errors, etc.)
+        if (data.event && data.event !== "price") {
+          if (data.event === "subscribe-status") {
+            function listSymbols(v) {
+              if (!v) return [];
+              if (!Array.isArray(v)) return [String(v)];
+              return v.map(function (x) {
+                if (typeof x === "string") return x;
+                if (x && typeof x === "object") {
+                  return x.symbol || x.ticker || x.name || JSON.stringify(x);
+                }
+                return String(x);
+              });
+            }
+
+            if (data.status === "ok") {
+              function listSymbols(v) {
+                if (!v) return [];
+                if (!Array.isArray(v)) return [String(v)];
+                return v.map(function (x) {
+                  if (typeof x === "string") return x;
+                  if (x && typeof x === "object") {
+                    return x.symbol || x.ticker || x.name || JSON.stringify(x);
+                  }
+                  return String(x);
+                });
+              }
+
+              var okSyms = listSymbols(data.success);
+              var failSyms = listSymbols(data.fails);
+              setStatus(
+                "Subscribed: "
+                  + (okSyms.length ? okSyms.join(", ") : "")
+                  + (failSyms.length ? (" (failed: " + failSyms.join(", ") + ")") : "")
+              );
+              if (failSyms.length) {
+                showAlert("Some symbols failed to subscribe: " + failSyms.join(", "), "alert-warning");
+              }
+            } else {
+              // Twelve Data may return status:"error" with fails but without a message/code.
+              var failSyms = listSymbols(data.fails);
+              if (failSyms.length) {
+                showAlert(
+                  "Failed to subscribe: " + failSyms.join(", ")
+                    + ". This usually means the symbol isn't supported for your plan/trial or isn't available right now.",
+                  "alert-danger"
+                );
+                setStatus("Subscribe failed: " + failSyms.join(", "));
+              } else {
+                var details = data.message || data.code || JSON.stringify(data);
+                showAlert("Subscribe error: " + (details || "UNKNOWN"), "alert-danger");
+                setStatus("Subscribe error.");
+              }
+            }
+          }
+          if (data.event === "error") {
+            showAlert("Upstream error: " + (data.message || data.code || JSON.stringify(data) || "UNKNOWN"), "alert-danger");
+            setStatus("Upstream error.");
+          }
+          return;
+        }
+        if (data.event !== "price") return;
+
+        var symbol = (data.symbol || "").toString().toUpperCase();
+        var price = Number(data.price);
+        var ts = data.timestamp ? Number(data.timestamp) * 1000 : Date.now();
+        if (!symbol || Number.isNaN(price)) return;
+
+        updateRow(symbol, price, ts);
+      }
+
+      function connectAndSubscribe() {
+        var symbols = normalizeSymbols(symbolsEl.value);
+        if (symbols.length === 0) {
+          setStatus("Enter at least one symbol to subscribe.");
+          showAlert("Enter at least one symbol (comma-separated).", "alert-warning");
+          return;
+        }
+
+        var scheme = (window.location.protocol === "https:") ? "wss" : "ws";
+        var wsUrl = scheme + "://" + window.location.host + "/ws/war-stream/";
+
+        hideAlert();
+        setStatus("Connecting… " + wsUrl);
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function () {
+          setStatus("Connected. Subscribing… (" + formatTimestampMs(Date.now()) + ")");
+          showAlert("Connected. Waiting for prices…", "alert-success");
+          disconnectBtn.disabled = false;
+          connectBtn.disabled = true;
+          ws.send(JSON.stringify({ action: "subscribe", symbols: symbols.join(",") }));
+        };
+        ws.onmessage = function (ev) {
+          try {
+            var msg = JSON.parse(ev.data);
+            if (msg.type === "ready") return;
+            if (msg.type === "error") {
+              setStatus("Error: " + (msg.error || "UNKNOWN"));
+              showAlert("Error: " + (msg.error || "UNKNOWN"), "alert-danger");
+              return;
+            }
+            handleUpstream(msg);
+          } catch (e) {
+            // ignore
+          }
+        };
+        ws.onclose = function (ev) {
+          setStatus("Disconnected. (code " + ev.code + ")");
+          showAlert("Disconnected. (code " + ev.code + ")", ev.code === 1000 ? "alert-secondary" : "alert-warning");
+          disconnectBtn.disabled = true;
+          connectBtn.disabled = false;
+          ws = null;
+        };
+        ws.onerror = function () {
+          setStatus("WebSocket error.");
+          showAlert("WebSocket error. Check that the server was restarted after enabling WebSockets.", "alert-warning");
+        };
+      }
+
+      function disconnect() {
+        if (ws) ws.close();
+      }
+
+      function clearTable() {
+        lastPriceBySymbol = {};
+        tbody.innerHTML = '<tr id="wsEmptyRow"><td class="ps-3 text-muted" colspan="5">No data yet.</td></tr>';
+        emptyRow = document.getElementById("wsEmptyRow");
+      }
+
+      connectBtn.addEventListener("click", connectAndSubscribe);
+      disconnectBtn.addEventListener("click", disconnect);
+      clearBtn.addEventListener("click", clearTable);
+    })();
+  </script>
+{% endblock %}
+

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load humanize tz %}
+
+{% block title %}Leaderboard | StockWars{% endblock %}
+
+{% block content %}
+  <div class="d-flex align-items-end justify-content-between mb-3">
+    <div>
+      <h1 class="h3 mb-1">Leaderboard</h1>
+      {% if competition %}
+        <div class="text-muted small">{{ competition.title }}</div>
+      {% else %}
+        <div class="text-muted small">No active competition.</div>
+      {% endif %}
+    </div>
+    {% if user_rank %}
+      <div class="text-end">
+        <div class="text-muted small">Your rank</div>
+        <div class="h5 mb-0">#{{ user_rank }}</div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      {% if rows %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th class="text-end">Rank</th>
+                <th>User</th>
+                <th class="text-end">Total value</th>
+                <th class="text-end">Return</th>
+                <th class="text-end">As of</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+                <tr>
+                  <td class="text-end">{{ r.rank }}</td>
+                  <td class="fw-semibold">{{ r.display }}</td>
+                  <td class="text-end">${{ r.total_value|floatformat:2|intcomma }}</td>
+                  <td class="text-end">{{ r.return_pct|floatformat:4 }}</td>
+                  <td class="text-end small text-muted">{{ r.as_of|localtime }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-3 text-muted">No snapshots yet. Run the snapshot job to populate the leaderboard.</div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+

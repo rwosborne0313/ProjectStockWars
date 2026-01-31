@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+{% load humanize tz %}
+
+{% block title %}Watchlist | StockWars{% endblock %}
+
+{% block messages %}
+  {% if messages %}
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+      {% for message in messages %}
+        <div class="toast align-items-center text-bg-{{ message.tags|default:'secondary' }} border-0 mb-2"
+             role="alert" aria-live="assertive" aria-atomic="true"
+             data-bs-autohide="false">
+          <div class="d-flex">
+            <div class="toast-body">
+              {{ message }}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+ 
+    <script>
+      (function () {
+        document.addEventListener("DOMContentLoaded", function () {
+          document.querySelectorAll(".toast").forEach(function (el) {
+            try {
+              var t = bootstrap.Toast.getOrCreateInstance(el);
+              t.show();
+            } catch (e) {}
+          });
+        });
+      })();
+    </script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="d-flex align-items-end justify-content-between mb-3">
+    <div>
+      <h1 class="h3 mb-1">Watchlist</h1>
+      <div class="text-muted small">Track more symbols with a dedicated watchlist page.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <form method="post" class="m-0">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="watchlist_refresh">
+        <button class="btn btn-outline-secondary" type="submit">Refresh</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="post" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="watchlist_add">
+        <div class="col-12 col-md-6">
+          <label class="form-label mb-1">Add symbol</label>
+          {{ add_form.symbol }}
+          {% if add_form.symbol.errors %}
+            <div class="text-danger small">{{ add_form.symbol.errors }}</div>
+          {% endif %}
+        </div>
+        <div class="col-12 col-md-3">
+          <button class="btn btn-primary w-100" type="submit">Add to watchlist</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+        <div>
+          <div class="fw-semibold mb-1">Chart</div>
+          <div class="text-muted small">Select a symbol to view its historical OHLCV.</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-end">
+          <div>
+            <label class="form-label mb-1 small">Symbol</label>
+            <select class="form-select" id="chartSymbol">
+              <option value="">Select…</option>
+              {% for sym in watchlist_symbols %}
+                <option value="{{ sym }}"{% if forloop.first %} selected{% endif %}>{{ sym }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label mb-1 small">Y axis</label>
+            <select class="form-select" id="chartMetric">
+              <option value="close" selected>Close</option>
+              <option value="open">Open</option>
+              <option value="high">High</option>
+              <option value="low">Low</option>
+              <option value="volume">Volume</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="chartAlert" class="alert alert-secondary d-none" role="alert"></div>
+
+      <div class="mb-3">
+        <canvas id="watchlistChart" height="240"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      {% if rows %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-0" id="watchlistTable">
+            <thead>
+              <tr>
+                <th class="js-sort text-decoration-underline" role="button" tabindex="0" data-key="symbol" data-type="text">Symbol</th>
+                <th class="text-end js-sort text-decoration-underline" role="button" tabindex="0" data-key="open" data-type="number">Open</th>
+                <th class="text-end js-sort text-decoration-underline" role="button" tabindex="0" data-key="high" data-type="number">High</th>
+                <th class="text-end js-sort text-decoration-underline" role="button" tabindex="0" data-key="low" data-type="number">Low</th>
+                <th class="text-end js-sort text-decoration-underline" role="button" tabindex="0" data-key="last" data-type="number">Last</th>
+                <th class="text-end js-sort text-decoration-underline" role="button" tabindex="0" data-key="change" data-type="number">$ Change</th>
+                <th class="text-end js-sort text-decoration-underline" role="button" tabindex="0" data-key="pct" data-type="number">% Change</th>
+                <th class="text-end js-sort text-decoration-underline" role="button" tabindex="0" data-key="hi52" data-type="number">52w High</th>
+                <th class="text-end js-sort text-decoration-underline" role="button" tabindex="0" data-key="lo52" data-type="number">52w Low</th>
+                <th class="text-end">As of</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+                <tr
+                  data-symbol="{{ r.symbol|upper }}"
+                  data-open="{% if r.open %}{{ r.open }}{% endif %}"
+                  data-high="{% if r.high %}{{ r.high }}{% endif %}"
+                  data-low="{% if r.low %}{{ r.low }}{% endif %}"
+                  data-last="{% if r.last_price %}{{ r.last_price }}{% endif %}"
+                  data-change="{% if r.change is not None %}{{ r.change }}{% endif %}"
+                  data-pct="{% if r.percent_change is not None %}{{ r.percent_change }}{% endif %}"
+                  data-hi52="{% if r.fifty_two_week_high %}{{ r.fifty_two_week_high }}{% endif %}"
+                  data-lo52="{% if r.fifty_two_week_low %}{{ r.fifty_two_week_low }}{% endif %}"
+                >
+                  <td class="fw-semibold">{{ r.symbol }}</td>
+                  <td class="text-end">{% if r.open %}{{ r.open|floatformat:2 }}{% else %}-{% endif %}</td>
+                  <td class="text-end">{% if r.high %}{{ r.high|floatformat:2 }}{% else %}-{% endif %}</td>
+                  <td class="text-end">{% if r.low %}{{ r.low|floatformat:2 }}{% else %}-{% endif %}</td>
+                  <td class="text-end">{% if r.last_price %}{{ r.last_price|floatformat:2 }}{% else %}-{% endif %}</td>
+                  <td class="text-end">
+                    {% if r.change is not None %}
+                      <span class="{% if r.change >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ r.change|floatformat:2 }}
+                      </span>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if r.percent_change is not None %}
+                      <span class="{% if r.percent_change >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {{ r.percent_change|floatformat:2 }}%
+                      </span>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td class="text-end">{% if r.fifty_two_week_high %}{{ r.fifty_two_week_high|floatformat:2 }}{% else %}-{% endif %}</td>
+                  <td class="text-end">{% if r.fifty_two_week_low %}{{ r.fifty_two_week_low|floatformat:2 }}{% else %}-{% endif %}</td>
+                  <td class="text-end small text-muted">{% if r.quote_as_of %}{{ r.quote_as_of|localtime }}{% else %}-{% endif %}</td>
+                  <td class="text-end">
+                    <form method="post" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="watchlist_remove">
+                      <input type="hidden" name="instrument_id" value="{{ r.instrument_id }}">
+                      <button class="btn btn-sm btn-outline-secondary" type="submit">Remove</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-3 text-muted">No watchlist symbols yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      function parseNum(v) {
+        if (v === null || v === undefined) return null;
+        var s = String(v).trim();
+        if (!s) return null;
+        var n = Number(s);
+        return Number.isNaN(n) ? null : n;
+      }
+ 
+      function sortRows(key, type, dir) {
+        var table = document.getElementById("watchlistTable");
+        if (!table) return;
+        var tbody = table.querySelector("tbody");
+        if (!tbody) return;
+ 
+        var rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort(function (a, b) {
+          var av = a.dataset[key] || "";
+          var bv = b.dataset[key] || "";
+ 
+          if (type === "number") {
+            var an = parseNum(av);
+            var bn = parseNum(bv);
+            // Put blanks at the bottom.
+            if (an === null && bn === null) return 0;
+            if (an === null) return 1;
+            if (bn === null) return -1;
+            return dir * (an - bn);
+          }
+ 
+          // text
+          var at = String(av).toUpperCase();
+          var bt = String(bv).toUpperCase();
+          if (at < bt) return -1 * dir;
+          if (at > bt) return 1 * dir;
+          return 0;
+        });
+ 
+        rows.forEach(function (r) {
+          tbody.appendChild(r);
+        });
+      }
+ 
+      document.addEventListener("DOMContentLoaded", function () {
+        var currentKey = null;
+        var currentDir = 1; // 1 asc, -1 desc
+ 
+        document.querySelectorAll("#watchlistTable thead .js-sort").forEach(function (th) {
+          function doSort() {
+            var key = th.getAttribute("data-key");
+            var type = th.getAttribute("data-type") || "text";
+            if (!key) return;
+ 
+            if (currentKey === key) {
+              currentDir = currentDir * -1;
+            } else {
+              currentKey = key;
+              currentDir = 1;
+            }
+ 
+            // Clear indicators
+            document.querySelectorAll("#watchlistTable thead .js-sort").forEach(function (h) {
+              h.querySelectorAll(".js-sort-ind").forEach(function (n) { n.remove(); });
+            });
+            var ind = document.createElement("span");
+            ind.className = "js-sort-ind ms-1 text-muted";
+            ind.textContent = currentDir === 1 ? "▲" : "▼";
+            th.appendChild(ind);
+ 
+            sortRows(key, type, currentDir);
+          }
+ 
+          th.addEventListener("click", doSort);
+          th.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              doSort();
+            }
+          });
+        });
+ 
+        // Default sort: Symbol ascending
+        sortRows("symbol", "text", 1);
+      });
+    })();
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      var symbolEl = document.getElementById("chartSymbol");
+      var metricEl = document.getElementById("chartMetric");
+      var alertEl = document.getElementById("chartAlert");
+      var canvas = document.getElementById("watchlistChart");
+      if (!symbolEl || !metricEl || !canvas) return;
+
+      var latestSeries = null;
+      var chart = null;
+
+      function showAlert(msg, tone) {
+        alertEl.classList.remove("d-none", "alert-secondary", "alert-danger", "alert-warning");
+        alertEl.classList.add(tone || "alert-secondary");
+        alertEl.textContent = msg;
+      }
+
+      function hideAlert() {
+        alertEl.classList.add("d-none");
+        alertEl.textContent = "";
+      }
+
+      function numOrNull(v) {
+        if (v === null || v === undefined) return null;
+        var n = Number(String(v).trim());
+        return Number.isNaN(n) ? null : n;
+      }
+
+      function fmt2(v) {
+        var n = numOrNull(v);
+        return n === null ? "-" : n.toFixed(2);
+      }
+
+      function fmtInt(v) {
+        var n = numOrNull(v);
+        if (n === null) return "-";
+        return Math.round(n).toLocaleString();
+      }
+
+      function renderChart(values, metric) {
+        var labels = (values || []).map(function (r) { return r.datetime; });
+        var data = (values || []).map(function (r) {
+          if (metric === "volume") return numOrNull(r.volume);
+          return numOrNull(r[metric]);
+        });
+
+        var color = metric === "volume" ? "rgba(13,110,253,0.9)" : "rgba(25,135,84,0.9)";
+        var fill = metric === "volume" ? "rgba(13,110,253,0.15)" : "rgba(25,135,84,0.15)";
+
+        if (chart) chart.destroy();
+        chart = new Chart(canvas, {
+          type: "line",
+          data: {
+            labels: labels,
+            datasets: [{
+              label: metric.toUpperCase(),
+              data: data,
+              borderColor: color,
+              backgroundColor: fill,
+              pointRadius: 0,
+              tension: 0.15,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: true }
+            },
+            scales: {
+              x: {
+                title: { display: true, text: "Close date" },
+                ticks: { maxTicksLimit: 10 }
+              },
+              y: {
+                title: { display: true, text: metric.toUpperCase() }
+              }
+            }
+          }
+        });
+      }
+
+      async function loadSeries(symbol) {
+        latestSeries = null;
+        hideAlert();
+        showAlert("Loading…", "alert-secondary");
+        try {
+          var url = "{% url 'simulator:watchlist_timeseries' %}?symbol=" + encodeURIComponent(symbol) + "&interval=1day&outputsize=120";
+          var resp = await fetch(url, { headers: { "Accept": "application/json" } });
+          var payload = await resp.json();
+          if (!resp.ok || !payload || !payload.ok) {
+            showAlert("Could not load time series data (" + ((payload && payload.error) || "ERROR") + ").", "alert-warning");
+            if (chart) chart.destroy();
+            chart = null;
+            return;
+          }
+          latestSeries = payload.values || [];
+          hideAlert();
+          renderChart(latestSeries, metricEl.value);
+        } catch (e) {
+          showAlert("Could not load time series data. Please try again.", "alert-warning");
+          if (chart) chart.destroy();
+          chart = null;
+        }
+      }
+
+      symbolEl.addEventListener("change", function () {
+        var sym = symbolEl.value;
+        if (!sym) {
+          hideAlert();
+          if (chart) chart.destroy();
+          chart = null;
+          return;
+        }
+        loadSeries(sym);
+      });
+
+      metricEl.addEventListener("change", function () {
+        if (!latestSeries || !latestSeries.length) return;
+        renderChart(latestSeries, metricEl.value);
+      });
+
+      // Auto-render on page load: select first watchlist symbol (if any).
+      if (symbolEl.value) {
+        loadSeries(symbolEl.value);
+      }
+    })();
+  </script>
+{% endblock %}
+

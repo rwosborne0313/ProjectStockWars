@@ -1,0 +1,670 @@
+{% extends "base.html" %}
+
+{% block title %}Terms of Service | StockWars{% endblock %}
+
+{% block content %}
+  <div class="p-4 p-md-5 rounded-4 border bg-body-tertiary mb-4">
+    <div class="text-uppercase small text-muted mb-2">Legal</div>
+    <h1 class="display-6 fw-semibold mb-2" id="terms-of-service">Terms of Service</h1>
+    <div class="lead mb-3">Stock Trading Competition Simulator</div>
+    <div class="d-flex flex-wrap gap-3 small text-muted">
+      <div><span class="fw-semibold">Effective Date:</span> 1/28/2026</div>
+      <div><span class="fw-semibold">Last Updated:</span> 1/28/2026</div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <p class="mb-3">
+            These Terms of Service (“Terms”) are a binding agreement between you (“User”) and Stock-Wars Inc. (“Company”).
+          </p>
+
+          <div class="alert alert-warning mb-4" role="alert">
+            <div class="fw-semibold">BY USING THE PLATFORM, YOU AGREE TO THESE TERMS.</div>
+          </div>
+
+          <div class="accordion" id="tosAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-1">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#tos-1" aria-expanded="true" aria-controls="tos-1">
+                  1. ASSUMPTION OF RISK
+                </button>
+              </h2>
+              <div id="tos-1" class="accordion-collapse collapse show" aria-labelledby="tos-h-1" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">YOU ACKNOWLEDGE:</div>
+                  <ul class="mb-3">
+                    <li>Markets are volatile and unpredictable</li>
+                    <li>Simulated results do not predict real performance</li>
+                    <li>Competitions involve uncertainty</li>
+                    <li>You participate voluntarily</li>
+                  </ul>
+                  <div class="fw-semibold">YOU ASSUME ALL RISKS.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-2">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-2" aria-expanded="false" aria-controls="tos-2">
+                  2. PLATFORM NATURE
+                </button>
+              </h2>
+              <div id="tos-2" class="accordion-collapse collapse" aria-labelledby="tos-h-2" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">The Platform:</div>
+                  <ul class="mb-3">
+                    <li>Is a simulation using virtual funds</li>
+                    <li>Does not execute real securities trades</li>
+                    <li>Is educational and entertainment-oriented</li>
+                  </ul>
+
+                  <div class="fw-semibold mb-2">The Company is NOT:</div>
+                  <ul class="mb-3">
+                    <li>A broker-dealer</li>
+                    <li>An investment advisor</li>
+                    <li>A securities exchange</li>
+                    <li>A bank</li>
+                    <li>A money transmitter</li>
+                    <li>A gambling operator</li>
+                  </ul>
+
+                  <div class="text-muted">Nothing herein creates a financial advisory or fiduciary relationship.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-3">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-3" aria-expanded="false" aria-controls="tos-3">
+                  3. NO FINANCIAL OR INVESTMENT ADVICE
+                </button>
+              </h2>
+              <div id="tos-3" class="accordion-collapse collapse" aria-labelledby="tos-h-3" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">No content constitutes:</div>
+                  <ul class="mb-3">
+                    <li>Investment advice</li>
+                    <li>Financial advice</li>
+                    <li>Tax advice</li>
+                    <li>Legal advice</li>
+                  </ul>
+                  <div class="text-muted">Users bear sole responsibility for real-world decisions.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-4">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-4" aria-expanded="false" aria-controls="tos-4">
+                  4. SKILL-BASED COMPETITIONS — NOT GAMBLING
+                </button>
+              </h2>
+              <div id="tos-4" class="accordion-collapse collapse" aria-labelledby="tos-h-4" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Competitions are skill-based.</p>
+                  <div class="fw-semibold mb-2">Entry fees compensate for:</div>
+                  <ul class="mb-3">
+                    <li>Platform access</li>
+                    <li>Technology services</li>
+                    <li>Administration</li>
+                    <li>Prize pools</li>
+                  </ul>
+                  <div class="text-muted">Users acknowledge skill contests still involve uncertainty.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-5">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-5" aria-expanded="false" aria-controls="tos-5">
+                  5. FINTECH REGULATORY POSITIONING
+                </button>
+              </h2>
+              <div id="tos-5" class="accordion-collapse collapse" aria-labelledby="tos-h-5" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">
+                    The Company operates a simulation and competition platform only and does not hold customer funds for investment or trading.
+                  </p>
+                  <div class="fw-semibold mb-2">To the extent payments or prizes are processed:</div>
+                  <ul class="mb-3">
+                    <li>Licensed third-party payment providers are used</li>
+                    <li>Funds transmission (if any) is handled by regulated entities</li>
+                    <li>The Company does not provide custody services for securities</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-6">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-6" aria-expanded="false" aria-controls="tos-6">
+                  6. COMPLIANCE WITH FINANCIAL CRIME LAWS
+                </button>
+              </h2>
+              <div id="tos-6" class="accordion-collapse collapse" aria-labelledby="tos-h-6" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">The Company may implement controls consistent with:</p>
+                  <ul class="mb-3">
+                    <li>Anti-Money Laundering (AML) laws</li>
+                    <li>Counter-Terrorist Financing (CTF) laws</li>
+                    <li>Sanctions regulations</li>
+                    <li>Fraud prevention laws</li>
+                  </ul>
+                  <div class="text-muted">Users agree to cooperate with reasonable compliance requests.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-7">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-7" aria-expanded="false" aria-controls="tos-7">
+                  7. KYC &amp; IDENTITY VERIFICATION
+                </button>
+              </h2>
+              <div id="tos-7" class="accordion-collapse collapse" aria-labelledby="tos-h-7" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">The Company may require:</p>
+                  <ul class="mb-3">
+                    <li>Identity verification</li>
+                    <li>Age verification</li>
+                    <li>Address confirmation</li>
+                    <li>Source-of-funds inquiry for prize payouts</li>
+                  </ul>
+                  <div class="text-muted">Failure to comply may result in suspension or forfeiture.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-8">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-8" aria-expanded="false" aria-controls="tos-8">
+                  8. SANCTIONS COMPLIANCE
+                </button>
+              </h2>
+              <div id="tos-8" class="accordion-collapse collapse" aria-labelledby="tos-h-8" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">Users represent they are not:</div>
+                  <ul class="mb-3">
+                    <li>Sanctioned individuals</li>
+                    <li>Located in comprehensively sanctioned jurisdictions</li>
+                    <li>Acting on behalf of prohibited parties</li>
+                  </ul>
+                  <div class="text-muted">The Company may screen users against sanctions lists.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-9">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-9" aria-expanded="false" aria-controls="tos-9">
+                  9. ABSOLUTE PLATFORM DISCRETION
+                </button>
+              </h2>
+              <div id="tos-9" class="accordion-collapse collapse" aria-labelledby="tos-h-9" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">The Company may at any time:</div>
+                  <ul class="mb-0">
+                    <li>Modify competitions</li>
+                    <li>Cancel events</li>
+                    <li>Adjust scoring</li>
+                    <li>Withhold prizes</li>
+                    <li>Limit access</li>
+                    <li>Suspend or terminate accounts</li>
+                  </ul>
+                  <div class="text-muted mt-2">At sole discretion for risk, compliance, or integrity reasons.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-10">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-10" aria-expanded="false" aria-controls="tos-10">
+                  10. FEES
+                </button>
+              </h2>
+              <div id="tos-10" class="accordion-collapse collapse" aria-labelledby="tos-h-10" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">All fees:</div>
+                  <ul class="mb-0">
+                    <li>Are non-refundable</li>
+                    <li>Do not guarantee winnings</li>
+                    <li>Are earned upon payment</li>
+                    <li>Chargebacks may result in bans</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-11">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-11" aria-expanded="false" aria-controls="tos-11">
+                  11. PRIZES
+                </button>
+              </h2>
+              <div id="tos-11" class="accordion-collapse collapse" aria-labelledby="tos-h-11" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">Prizes:</div>
+                  <ul class="mb-0">
+                    <li>Are conditional and revocable</li>
+                    <li>Subject to compliance checks</li>
+                    <li>May require tax reporting documents</li>
+                    <li>May be delayed for verification</li>
+                    <li>Users are responsible for taxes</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-12">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-12" aria-expanded="false" aria-controls="tos-12">
+                  12. USER PROHIBITIONS
+                </button>
+              </h2>
+              <div id="tos-12" class="accordion-collapse collapse" aria-labelledby="tos-h-12" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">Users shall not:</div>
+                  <ul class="mb-3">
+                    <li>Cheat or exploit bugs</li>
+                    <li>Use bots</li>
+                    <li>Reverse engineer</li>
+                    <li>Manipulate competitions</li>
+                    <li>Collude</li>
+                    <li>Attempt fraud</li>
+                  </ul>
+                  <div class="text-muted">We may investigate and act unilaterally.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-13">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-13" aria-expanded="false" aria-controls="tos-13">
+                  13. INTELLECTUAL PROPERTY
+                </button>
+              </h2>
+              <div id="tos-13" class="accordion-collapse collapse" aria-labelledby="tos-h-13" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-0">
+                    All Platform IP belongs to the Company. Users receive a limited, revocable license.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-14">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-14" aria-expanded="false" aria-controls="tos-14">
+                  14. DISCLAIMERS (MAXIMUM)
+                </button>
+              </h2>
+              <div id="tos-14" class="accordion-collapse collapse" aria-labelledby="tos-h-14" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">THE PLATFORM IS PROVIDED:</div>
+                  <ul class="mb-0">
+                    <li>“AS IS”</li>
+                    <li>“AS AVAILABLE”</li>
+                    <li>“WITH ALL FAULTS”</li>
+                  </ul>
+                  <div class="text-muted mt-2">We disclaim all warranties.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-15">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-15" aria-expanded="false" aria-controls="tos-15">
+                  15. LIMITATION OF LIABILITY (MAXIMUM SHIELD)
+                </button>
+              </h2>
+              <div id="tos-15" class="accordion-collapse collapse" aria-labelledby="tos-h-15" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">TO THE MAXIMUM EXTENT PERMITTED BY LAW:</div>
+                  <p class="mb-2">The Company and its leadership are not liable for:</p>
+                  <ul class="mb-3">
+                    <li>Financial losses</li>
+                    <li>Lost profits</li>
+                    <li>Data loss</li>
+                    <li>Service interruptions</li>
+                    <li>Security incidents</li>
+                    <li>Third-party failures</li>
+                    <li>Competition outcomes</li>
+                  </ul>
+                  <div class="fw-semibold mb-2">TOTAL LIABILITY CAP = GREATER OF:</div>
+                  <ul class="mb-0">
+                    <li>$100 USD</li>
+                    <li>Fees paid in prior 12 months</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-16">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-16" aria-expanded="false" aria-controls="tos-16">
+                  16. INDEMNIFICATION
+                </button>
+              </h2>
+              <div id="tos-16" class="accordion-collapse collapse" aria-labelledby="tos-h-16" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Users indemnify the Company from claims arising from:</p>
+                  <ul class="mb-0">
+                    <li>Misconduct</li>
+                    <li>Legal violations</li>
+                    <li>Breach of Terms</li>
+                    <li>Fraud or abuse</li>
+                  </ul>
+                  <div class="text-muted mt-2">Survives termination.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-17">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-17" aria-expanded="false" aria-controls="tos-17">
+                  17. ARBITRATION &amp; CLASS ACTION WAIVER
+                </button>
+              </h2>
+              <div id="tos-17" class="accordion-collapse collapse" aria-labelledby="tos-h-17" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Users waive:</p>
+                  <ul class="mb-3">
+                    <li>Jury trials</li>
+                    <li>Class actions</li>
+                    <li>Collective claims</li>
+                  </ul>
+                  <div class="text-muted">Binding arbitration in Delaware.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-18">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-18" aria-expanded="false" aria-controls="tos-18">
+                  18. TERMINATION
+                </button>
+              </h2>
+              <div id="tos-18" class="accordion-collapse collapse" aria-labelledby="tos-h-18" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-0">Access may be terminated anytime without notice.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-19">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-19" aria-expanded="false" aria-controls="tos-19">
+                  19. FORCE MAJEURE
+                </button>
+              </h2>
+              <div id="tos-19" class="accordion-collapse collapse" aria-labelledby="tos-h-19" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold mb-2">No liability for:</div>
+                  <ul class="mb-0">
+                    <li>Regulatory changes</li>
+                    <li>Market disruptions</li>
+                    <li>Cyberattacks</li>
+                    <li>Infrastructure failures</li>
+                    <li>Natural disasters</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="tos-h-20">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tos-20" aria-expanded="false" aria-controls="tos-20">
+                  20. GOVERNING LAW
+                </button>
+              </h2>
+              <div id="tos-20" class="accordion-collapse collapse" aria-labelledby="tos-h-20" data-bs-parent="#tosAccordion">
+                <div class="accordion-body">
+                  <p class="mb-0">Governed by laws of Delaware.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <h2 class="h4 fw-semibold mb-3" id="privacy-policy">Privacy Policy</h2>
+          <div class="accordion" id="privacyAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-1">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#pp-1" aria-expanded="true" aria-controls="pp-1">
+                  1. DATA CONTROLLER
+                </button>
+              </h2>
+              <div id="pp-1" class="accordion-collapse collapse show" aria-labelledby="pp-h-1" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <div class="fw-semibold">Stock-Wars Inc.</div>
+                  <div class="text-muted">Contact: __________________</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-2">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-2" aria-expanded="false" aria-controls="pp-2">
+                  2. DATA COLLECTED
+                </button>
+              </h2>
+              <div id="pp-2" class="accordion-collapse collapse" aria-labelledby="pp-h-2" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <ul class="mb-0">
+                    <li>Identity data</li>
+                    <li>Contact data</li>
+                    <li>Device data</li>
+                    <li>IP addresses</li>
+                    <li>Usage logs</li>
+                    <li>Competition activity</li>
+                    <li>Payment metadata</li>
+                    <li>Verification/KYC data where required</li>
+                    <li>Payment related information</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-3">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-3" aria-expanded="false" aria-controls="pp-3">
+                  3. PURPOSES
+                </button>
+              </h2>
+              <div id="pp-3" class="accordion-collapse collapse" aria-labelledby="pp-h-3" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Data is processed to:</p>
+                  <ul class="mb-0">
+                    <li>Operate competitions</li>
+                    <li>Prevent fraud</li>
+                    <li>Meet AML/sanctions compliance</li>
+                    <li>Ensure security</li>
+                    <li>Conduct analytics</li>
+                    <li>Comply with law</li>
+                    <li>Defend legal claims</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-4">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-4" aria-expanded="false" aria-controls="pp-4">
+                  4. GDPR LEGAL BASES
+                </button>
+              </h2>
+              <div id="pp-4" class="accordion-collapse collapse" aria-labelledby="pp-h-4" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Processing relies on:</p>
+                  <ul class="mb-0">
+                    <li>Contract necessity</li>
+                    <li>Legitimate interests (fraud, security, platform integrity)</li>
+                    <li>Legal obligations (AML/sanctions/tax)</li>
+                    <li>Consent where required</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-5">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-5" aria-expanded="false" aria-controls="pp-5">
+                  5. DATA RETENTION
+                </button>
+              </h2>
+              <div id="pp-5" class="accordion-collapse collapse" aria-labelledby="pp-h-5" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Data retained as necessary for:</p>
+                  <ul class="mb-2">
+                    <li>Compliance</li>
+                    <li>Legal defense</li>
+                    <li>Fraud prevention</li>
+                  </ul>
+                  <div class="text-muted">Anonymized data may be retained indefinitely.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-6">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-6" aria-expanded="false" aria-controls="pp-6">
+                  6. DATA SHARING
+                </button>
+              </h2>
+              <div id="pp-6" class="accordion-collapse collapse" aria-labelledby="pp-h-6" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">We may share data with:</p>
+                  <ul class="mb-2">
+                    <li>Payment processors</li>
+                    <li>KYC/AML vendors</li>
+                    <li>Cloud providers</li>
+                    <li>Security vendors</li>
+                    <li>Regulators and law enforcement</li>
+                    <li>Corporate transaction counterparties</li>
+                  </ul>
+                  <div class="text-muted">We do not sell personal data.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-7">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-7" aria-expanded="false" aria-controls="pp-7">
+                  7. INTERNATIONAL TRANSFERS
+                </button>
+              </h2>
+              <div id="pp-7" class="accordion-collapse collapse" aria-labelledby="pp-h-7" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Transfers may occur under safeguards such as:</p>
+                  <ul class="mb-0">
+                    <li>Standard Contractual Clauses</li>
+                    <li>Adequacy decisions</li>
+                    <li>Technical protections</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-8">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-8" aria-expanded="false" aria-controls="pp-8">
+                  8. SECURITY
+                </button>
+              </h2>
+              <div id="pp-8" class="accordion-collapse collapse" aria-labelledby="pp-h-8" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">We use reasonable safeguards but cannot guarantee absolute security.</p>
+                  <div class="text-muted">Users accept inherent risk.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-9">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-9" aria-expanded="false" aria-controls="pp-9">
+                  9. USER RIGHTS
+                </button>
+              </h2>
+              <div id="pp-9" class="accordion-collapse collapse" aria-labelledby="pp-h-9" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Where applicable:</p>
+                  <ul class="mb-2">
+                    <li>Access</li>
+                    <li>Correction</li>
+                    <li>Deletion</li>
+                    <li>Restriction</li>
+                    <li>Objection</li>
+                  </ul>
+                  <div class="text-muted">Requests may be declined where legally justified.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-10">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-10" aria-expanded="false" aria-controls="pp-10">
+                  10. COOKIES
+                </button>
+              </h2>
+              <div id="pp-10" class="accordion-collapse collapse" aria-labelledby="pp-h-10" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-2">Used for:</p>
+                  <ul class="mb-0">
+                    <li>Authentication</li>
+                    <li>Security</li>
+                    <li>Analytics</li>
+                    <li>Performance</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-11">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-11" aria-expanded="false" aria-controls="pp-11">
+                  11. CHILDREN
+                </button>
+              </h2>
+              <div id="pp-11" class="accordion-collapse collapse" aria-labelledby="pp-h-11" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-0">Not for users under 18.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="pp-h-12">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pp-12" aria-expanded="false" aria-controls="pp-12">
+                  12. POLICY UPDATES
+                </button>
+              </h2>
+              <div id="pp-12" class="accordion-collapse collapse" aria-labelledby="pp-h-12" data-bs-parent="#privacyAccordion">
+                <div class="accordion-body">
+                  <p class="mb-0">Continued use = acceptance.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-uppercase small text-muted mb-2">Highlights</div>
+          <ul class="mb-0">
+            <li>Simulation using virtual funds only.</li>
+            <li>Competitions are skill-based (not gambling).</li>
+            <li>Market data and outcomes may be uncertain.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

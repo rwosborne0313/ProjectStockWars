@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% load tz humanize %}
+
+{% block title %}{{ competition.title }} | StockWars{% endblock %}
+
+{% block content %}
+  <div class="p-4 p-md-5 rounded-4 border bg-body-tertiary mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <div class="text-uppercase small text-muted mb-2">Competition details</div>
+        <h1 class="display-6 fw-semibold mb-2">{{ competition.title }}</h1>
+        <div class="text-muted">
+          {{ competition.week_start_at|localtime }} → {{ competition.week_end_at|localtime }}
+          <span class="mx-2">·</span>
+          Status: <span class="fw-semibold">{{ competition.status }}</span>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'competitions:current_competitions' %}">Back to current competitions</a>
+        {% if user.is_authenticated %}
+          {% if is_joined %}
+            <a href="{% url 'simulator:dashboard_for_competition' competition.id %}" class="btn btn-primary">Go to your dashboard</a>
+          {% else %}
+            <a href="{% url 'competitions:join_competition' competition.id %}" class="btn btn-primary">Join this competition</a>
+          {% endif %}
+        {% else %}
+          <a href="{% url 'login' %}" class="btn btn-primary">Log in to join</a>
+          <a href="{% url 'accounts:signup' %}" class="btn btn-outline-primary">Create account</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card mb-3 shadow-sm">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="text-muted small">Starting cash</div>
+              <div class="h4 mb-0 fw-bold text-success">${{ competition.starting_cash|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-muted small">What you can trade</div>
+              <div class="fw-semibold">Any symbol</div>
+              <div class="text-muted small">Stocks &amp; ETFs</div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-muted small">How you compete</div>
+              <div class="fw-semibold">Your rank only</div>
+              <div class="text-muted small">Your rank is the only thing that matters!</div>
+            </div>
+          </div>
+          {% if competition.first_place_cash_prize or competition.second_place_cash_prize or competition.third_place_cash_prize or competition.non_cash_prize or competition.entry_fee %}
+            <hr class="my-3">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="text-muted small mb-1">Prizes</div>
+                <div class="d-flex flex-column gap-1">
+                  {% if competition.first_place_cash_prize %}<div class="h5 fw-bold text-success mb-1">1st: ${{ competition.first_place_cash_prize|floatformat:2|intcomma }}</div>{% endif %}
+                  {% if competition.second_place_cash_prize %}<div class="fw-semibold">2nd: ${{ competition.second_place_cash_prize|floatformat:2|intcomma }}</div>{% endif %}
+                  {% if competition.third_place_cash_prize %}<div class="fw-semibold">3rd: ${{ competition.third_place_cash_prize|floatformat:2|intcomma }}</div>{% endif %}
+                  {% if competition.non_cash_prize %}<div class="fw-semibold">Non-cash: {{ competition.non_cash_prize }}</div>{% endif %}
+                  {% if not competition.first_place_cash_prize and not competition.second_place_cash_prize and not competition.third_place_cash_prize and not competition.non_cash_prize %}
+                    <div class="text-muted small">No prize details listed.</div>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="text-muted small">Entry fee</div>
+                <div class="fw-semibold">
+                  {% if competition.entry_fee %}Only ${{ competition.entry_fee|floatformat:2|intcomma }}{% else %}Free{% endif %}
+                </div>
+                <div class="text-muted small">Low entry fee to get started.</div>
+              </div>
+            </div>
+          {% endif %}
+          <hr class="my-3">
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <div class="d-flex gap-2">
+                <div class="text-success fw-semibold">✓</div>
+                <div>
+                  <div class="fw-semibold">Simple order types</div>
+                  <div class="text-muted small">Market &amp; limit (immediate fill-or-reject).</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="d-flex gap-2">
+                <div class="text-success fw-semibold">✓</div>
+                <div>
+                  <div class="fw-semibold">Fast feedback</div>
+                  <div class="text-muted small">Refresh positions/watchlist quotes on demand.</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="d-flex gap-2">
+                <div class="text-success fw-semibold">✓</div>
+                <div>
+                  <div class="fw-semibold">Track performance</div>
+                  <div class="text-muted small">Equity, holdings, and P&amp;L all in one dashboard.</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="d-flex gap-2">
+                <div class="text-success fw-semibold">✓</div>
+                <div>
+                  <div class="fw-semibold">Sponsored experience</div>
+                  <div class="text-muted small">Learn more from this week’s sponsor below.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if competition.rules_markdown %}
+        <div class="card mb-3 shadow-sm">
+          <div class="card-header">Rules &amp; details</div>
+          <div class="card-body">
+            <pre class="mb-0" style="white-space: pre-wrap;">{{ competition.rules_markdown }}</pre>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card shadow-sm">
+        <div class="card-header">Why join?</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="fw-semibold mb-1">Make it a weekly challenge</div>
+              <div class="text-muted small">
+                Put your strategy to the test and see where you land on the leaderboard!
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="fw-semibold mb-1">Compete for bragging rights, prizes, and more!</div>
+              <div class="text-muted small">
+                Some sponsored competitions may offer cash prizes for top performers (where offered). Check the sponsor details for specifics.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-header">Geting Started is Easy!</div>
+        <div class="card-body">
+          {% if user.is_authenticated %}
+            {% if is_joined %}
+              <a href="{% url 'simulator:dashboard_for_competition' competition.id %}" class="btn btn-primary w-100">Go to your dashboard</a>
+            {% else %}
+              <a href="{% url 'competitions:join_competition' competition.id %}" class="btn btn-primary w-100">Join competition</a>
+            {% endif %}
+          {% else %}
+            <a href="{% url 'login' %}" class="btn btn-primary w-100">Log in to join</a>
+            <a href="{% url 'accounts:signup' %}" class="btn btn-outline-primary w-100 mt-2">Create account</a>
+          {% endif %}
+          <div class="text-muted small mt-3">
+            Simulation only. Not investment advice.
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-3 shadow-sm">
+        <div class="card-header">Sponsor spotlight</div>
+        <div class="card-body">
+          <div class="fw-semibold">{{ competition.sponsor.name }}</div>
+          {% if competition.sponsor.description %}
+            <div class="text-muted small mt-1">{{ competition.sponsor.description }}</div>
+          {% endif %}
+          {% if competition.sponsor.website %}
+            <div class="mt-3">
+              <a class="btn btn-outline-secondary w-100" href="{{ competition.sponsor.website }}" target="_blank" rel="noopener">
+                Visit sponsor site
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

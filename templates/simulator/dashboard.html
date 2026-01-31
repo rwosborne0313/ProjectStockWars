@@ -1,0 +1,825 @@
+{% extends "base.html" %}
+{% load humanize tz %}
+
+{% block title %}Dashboard | StockWars{% endblock %}
+
+{% block messages %}
+  {% if messages %}
+    {% for message in messages %}
+      {# Route trade-limit rejections into the modal (don't show a top-page alert). #}
+      {% if "trade-limit-modal" in message.tags %}
+        <div id="tradeLimitServerMessage" class="d-none">{{ message }}</div>
+      {% else %}
+        {% with level=message.level_tag %}
+          {% if level == "error" %}
+            <div class="alert alert-danger mb-3" role="alert">{{ message }}</div>
+          {% else %}
+            <div class="alert alert-{{ level }} mb-3" role="alert">{{ message }}</div>
+          {% endif %}
+        {% endwith %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+      <div class="text-muted small">Active competition</div>
+      <div class="h4 mb-0">{{ participant.competition.title }}</div>
+      {% if joined_participants %}
+        <div class="mt-2">
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              Switch competition
+            </button>
+            <ul class="dropdown-menu">
+              {% for p in joined_participants %}
+                <li>
+                  <a class="dropdown-item {% if p.competition_id == participant.competition_id %}active{% endif %}"
+                     href="{% url 'simulator:dashboard_for_competition' p.competition_id %}">
+                    {{ p.competition.title }}
+                  </a>
+                </li>
+              {% endfor %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'competitions:my_competitions' %}">My competitions</a></li>
+              <li><a class="dropdown-item" href="{% url 'competitions:active_competitions' %}">Browse active</a></li>
+            </ul>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <div class="text-end">
+      <div class="text-muted small">Total value</div>
+      <div class="h4 mb-0">${{ total_value|floatformat:2|intcomma }}</div>
+      <div class="small {% if return_pct >= 0 %}text-success{% else %}text-danger{% endif %}">
+        {{ return_pct|floatformat:4 }} return
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-lg-6">
+      <div class="card">
+        <div class="card-header bg-body-tertiary fw-semibold">Account summary</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="text-muted small">Total equity</div>
+              <div class="h5 mb-0">${{ total_value|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-muted small">Cash / Buying power</div>
+              <div class="h5 mb-0">${{ cash_balance|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-muted small">Market value of positions</div>
+              <div class="h5 mb-0">${{ holdings_value|floatformat:2|intcomma }}</div>
+            </div>
+          </div>
+          <hr class="my-3">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="text-muted small">Unrealized P&amp;L</div>
+              <div class="fw-semibold {% if unrealized_total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                ${{ unrealized_total|floatformat:2|intcomma }}
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-muted small">Realized P&amp;L (today)</div>
+              <div class="fw-semibold {% if realized_today >= 0 %}text-success{% else %}text-danger{% endif %}">
+                ${{ realized_today|floatformat:2|intcomma }}
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="text-muted small">Realized P&amp;L (total)</div>
+              <div class="fw-semibold {% if realized_total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                ${{ realized_total|floatformat:2|intcomma }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary-subtle d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">Your ranking in this competition</span>
+          <span class="badge text-bg-primary">Rank</span>
+        </div>
+        <div class="card-body">
+          <div class="text-muted small mb-2">
+            Rankings are shown as <span class="fw-semibold">your position out of {{ ranking_card.total }}</span>. No other investor details are shown.
+          </div>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">Total equity</span>
+                <span class="fw-semibold">
+                  #{{ ranking_card.equity }} / {{ ranking_card.total }}
+                  {% if ranking_card.equity == 1 or ranking_card.equity == 2 or ranking_card.equity == 3 %}
+                    <span class="ms-1 align-middle">
+                      {% if ranking_card.equity == 1 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% elif ranking_card.equity == 2 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-secondary" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning opacity-75" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% endif %}
+                    </span>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">Market value</span>
+                <span class="fw-semibold">
+                  #{{ ranking_card.holdings }} / {{ ranking_card.total }}
+                  {% if ranking_card.holdings == 1 or ranking_card.holdings == 2 or ranking_card.holdings == 3 %}
+                    <span class="ms-1 align-middle">
+                      {% if ranking_card.holdings == 1 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% elif ranking_card.holdings == 2 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-secondary" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning opacity-75" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% endif %}
+                    </span>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">Cash / buying power</span>
+                <span class="fw-semibold">
+                  #{{ ranking_card.cash }} / {{ ranking_card.total }}
+                  {% if ranking_card.cash == 1 or ranking_card.cash == 2 or ranking_card.cash == 3 %}
+                    <span class="ms-1 align-middle">
+                      {% if ranking_card.cash == 1 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% elif ranking_card.cash == 2 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-secondary" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning opacity-75" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% endif %}
+                    </span>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">Unrealized P&amp;L</span>
+                <span class="fw-semibold">
+                  #{{ ranking_card.unrealized }} / {{ ranking_card.total }}
+                  {% if ranking_card.unrealized == 1 or ranking_card.unrealized == 2 or ranking_card.unrealized == 3 %}
+                    <span class="ms-1 align-middle">
+                      {% if ranking_card.unrealized == 1 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% elif ranking_card.unrealized == 2 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-secondary" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning opacity-75" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% endif %}
+                    </span>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">Realized P&amp;L (today)</span>
+                <span class="fw-semibold">
+                  #{{ ranking_card.realized_today }} / {{ ranking_card.total }}
+                  {% if ranking_card.realized_today == 1 or ranking_card.realized_today == 2 or ranking_card.realized_today == 3 %}
+                    <span class="ms-1 align-middle">
+                      {% if ranking_card.realized_today == 1 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% elif ranking_card.realized_today == 2 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-secondary" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning opacity-75" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% endif %}
+                    </span>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">Realized P&amp;L (total)</span>
+                <span class="fw-semibold">
+                  #{{ ranking_card.realized_total }} / {{ ranking_card.total }}
+                  {% if ranking_card.realized_total == 1 or ranking_card.realized_total == 2 or ranking_card.realized_total == 3 %}
+                    <span class="ms-1 align-middle">
+                      {% if ranking_card.realized_total == 1 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% elif ranking_card.realized_total == 2 %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-secondary" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="text-warning opacity-75" aria-hidden="true">
+                          <path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536-.079 1.761-.328 3.268-.9 4.347-.57 1.077-1.49 1.86-2.813 2.07-.636.101-1.274.11-1.753.07v1.01h3.5a.5.5 0 0 1 0 1h-9a.5.5 0 0 1 0-1H7v-1.01c-.479.04-1.117.03-1.753-.07-1.323-.21-2.243-.993-2.813-2.07C1.862 5.304 1.613 3.797 1.534 2.036A31.014 31.014 0 0 1 1.5.5.5.5 0 0 1 2.5.5zM2.5 1c.003.463.017.927.04 1.39.076 1.71.31 3.06.775 3.94.463.88 1.145 1.45 2.21 1.62.745.118 1.505.09 1.975.034a.5.5 0 0 1 .56.497V11h1V8.48a.5.5 0 0 1 .56-.497c.47.056 1.23.084 1.975-.034 1.065-.17 1.747-.74 2.21-1.62.465-.88.699-2.23.775-3.94.023-.463.037-.927.04-1.39h-10z"/>
+                        </svg>
+                      {% endif %}
+                    </span>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-2">
+      <div class="card mb-4">
+        <div class="card-header bg-body-tertiary fw-semibold">Place Trade</div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-2">
+              <label class="form-label">Order</label>
+              {{ form.side }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Type</label>
+              {{ form.order_type }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Symbol</label>
+              {{ form.symbol }}
+              {% if form.symbol.errors %}
+                <div class="text-danger small">{{ form.symbol.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Quantity</label>
+              {{ form.quantity }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Limit price (limit only)</label>
+              {{ form.limit_price }}
+              {% if form.limit_price.errors %}
+                <div class="text-danger small">{{ form.limit_price.errors }}</div>
+              {% endif %}
+            </div>
+            <button class="btn btn-primary w-100" type="submit">Submit order</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-lg-10">
+      <div class="card mb-4">
+        <div class="card-header bg-body-tertiary fw-semibold d-flex justify-content-between align-items-center">
+          <span>Positions</span>
+          <form method="post" class="m-0">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="positions_refresh">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Refresh</button>
+          </form>
+        </div>
+        <div class="card-body p-0">
+          {% if position_rows %}
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th class="ps-3">Symbol</th>
+                    <th class="text-end">Qty</th>
+                    <th class="text-end">Avg cost</th>
+                    <th class="text-end">Last</th>
+                    <th class="text-end">Unrealized</th>
+                    <th class="text-end">Unrealized %</th>
+                    <th class="text-end">Market value</th>
+                    <th class="text-end">% portfolio</th>
+                    <th class="text-end">Quote as of</th>
+                    <th class="pe-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in position_rows %}
+                    <tr>
+                      <td class="fw-semibold ps-3">{{ row.symbol }}</td>
+                      <td class="text-end">{{ row.quantity }}</td>
+                      <td class="text-end">{{ row.avg_cost|floatformat:2 }}</td>
+                      <td class="text-end">{% if row.last_price %}{{ row.last_price|floatformat:2 }}{% else %}-{% endif %}</td>
+                      <td class="text-end">
+                        {% if row.unrealized is not None %}
+                          <span class="{% if row.unrealized >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            ${{ row.unrealized|floatformat:2|intcomma }}
+                          </span>
+                        {% else %}
+                          -
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if row.unrealized_pct is not None %}
+                          <span class="{% if row.unrealized_pct >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ row.unrealized_pct|floatformat:2 }}
+                          </span>
+                        {% else %}
+                          -
+                        {% endif %}
+                      </td>
+                      <td class="text-end">{% if row.market_value %}${{ row.market_value|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
+                      <td class="text-end">{% if row.pct_portfolio is not None %}{{ row.pct_portfolio|floatformat:2 }}{% else %}-{% endif %}</td>
+                      <td class="text-end small text-muted">{% if row.quote_as_of %}{{ row.quote_as_of|localtime }}{% else %}-{% endif %}</td>
+                      <td class="text-end pe-3">
+                        <form method="post" class="d-inline">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="close_position">
+                          <input type="hidden" name="instrument_id" value="{{ row.instrument_id }}">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger js-close-position"
+                            data-bs-toggle="modal"
+                            data-bs-target="#closePositionModal"
+                            data-symbol="{{ row.symbol }}"
+                            data-qty="{{ row.quantity }}"
+                          >
+                            Close
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="p-3 text-muted">No positions yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header bg-body-tertiary fw-semibold">Recent orders</div>
+        <div class="card-body p-0">
+          <div class="p-3 border-bottom">
+            <form method="get" class="row g-2 align-items-end" id="orderSearchForm">
+              <div class="col-12 col-md-3">
+                <label class="form-label mb-1">Placed date</label>
+                {{ order_search_form.placed_date }}
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label mb-1">Symbol</label>
+                {{ order_search_form.symbol }}
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label mb-1">Type</label>
+                {{ order_search_form.order_type }}
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label mb-1">Side</label>
+                {{ order_search_form.side }}
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label mb-1">Status</label>
+                {{ order_search_form.status }}
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label mb-1">Qty</label>
+                {{ order_search_form.quantity }}
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label mb-1">Price</label>
+                {{ order_search_form.price }}
+              </div>
+              <div class="col-12 col-md-8 d-flex gap-2">
+                <button class="btn btn-primary" type="submit">Search</button>
+                <button class="btn btn-outline-secondary" type="button" id="orderSearchClear">Clear</button>
+              </div>
+              {% if order_search_form.non_field_errors %}
+                <div class="col-12">
+                  <div class="text-danger small">{{ order_search_form.non_field_errors }}</div>
+                </div>
+              {% endif %}
+            </form>
+          </div>
+          {% if recent_orders %}
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0" id="recentOrdersTable">
+                <thead>
+                  <tr>
+                    <th class="ps-3">Time</th>
+                    <th>Symbol</th>
+                    <th>Type</th>
+                    <th>Side</th>
+                    <th class="text-end">Qty</th>
+                    <th class="text-end">Limit</th>
+                    <th>Status</th>
+                    <th class="text-end pe-3">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for o in recent_orders %}
+                    <tr
+                      data-date="{{ o.created_at|localtime|date:'Y-m-d' }}"
+                      data-symbol="{{ o.instrument.symbol|upper }}"
+                      data-order-type="{{ o.order_type }}"
+                      data-side="{{ o.side }}"
+                      data-qty="{{ o.quantity }}"
+                      data-status="{{ o.status }}"
+                      data-submitted-price="{% if o.submitted_price %}{{ o.submitted_price|floatformat:2 }}{% endif %}"
+                      data-limit-price="{% if o.limit_price %}{{ o.limit_price|floatformat:2 }}{% endif %}"
+                    >
+                      <td class="small text-muted ps-3">{{ o.created_at|localtime }}</td>
+                      <td class="fw-semibold">{{ o.instrument.symbol }}</td>
+                      <td>{{ o.order_type }}</td>
+                      <td>{{ o.side }}</td>
+                      <td class="text-end">{{ o.quantity }}</td>
+                      <td class="text-end">{% if o.limit_price %}{{ o.limit_price|floatformat:2 }}{% else %}-{% endif %}</td>
+                      <td>{{ o.status }}</td>
+                      <td class="text-end pe-3">${% if o.submitted_price %}{{ o.submitted_price|floatformat:2 }}{% else %}-{% endif %}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="p-3 text-muted d-none" id="recentOrdersNoResults">No matching orders.</div>
+            <div class="p-3 border-top" id="recentOrdersPagination">
+              <nav aria-label="Recent orders pagination" class="d-flex justify-content-between align-items-center gap-3">
+                <div class="small text-muted" id="recentOrdersPageInfo">Showing 0–0 of 0</div>
+                <ul class="pagination pagination-sm mb-0" id="recentOrdersPager">
+                  <li class="page-item"><button class="page-link" type="button" data-page="prev">Previous</button></li>
+                  <li class="page-item"><button class="page-link" type="button" data-page="next">Next</button></li>
+                </ul>
+              </nav>
+            </div>
+          {% else %}
+            <div class="p-3 text-muted">No orders yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="closePositionModal" tabindex="-1" aria-labelledby="closePositionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="closePositionModalLabel">Confirm close position</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">
+            You are about to close your entire position with a <span class="fw-semibold">Market</span> order:
+          </div>
+          <ul class="mb-0">
+            <li><span class="text-muted">Symbol:</span> <span class="fw-semibold" id="closePosSymbol">—</span></li>
+            <li><span class="text-muted">Shares:</span> <span class="fw-semibold" id="closePosQty">—</span></li>
+            <li><span class="text-muted">Order type:</span> <span class="fw-semibold">MARKET</span></li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger" id="confirmClosePositionBtn">Sell</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="tradeLimitModal" tabindex="-1" aria-labelledby="tradeLimitModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="tradeLimitModalLabel">Trade size limit</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="tradeLimitModalBody">
+          {% if trade_limit_modal %}
+            <div class="mb-2">
+              A single stock position cannot exceed <span class="fw-semibold">33%</span> of your total equity.
+            </div>
+            <ul class="mb-0">
+              <li>
+                <span class="text-muted">Estimated trade value:</span>
+                <span class="fw-semibold">${{ trade_limit_modal.trade_value|floatformat:2|intcomma }}</span>
+                {% if trade_limit_modal.trade_shares and trade_limit_modal.quote_price %}
+                  <span class="text-muted small">({{ trade_limit_modal.trade_shares }} shares @ ${{ trade_limit_modal.quote_price|floatformat:2 }})</span>
+                {% endif %}
+              </li>
+              {% if trade_limit_modal.existing_shares and trade_limit_modal.existing_shares|add:0 > 0 %}
+                <li>
+                  <span class="text-muted">Current position value:</span>
+                  <span class="fw-semibold">${{ trade_limit_modal.existing_value|floatformat:2|intcomma }}</span>
+                  <span class="text-muted small">({{ trade_limit_modal.existing_shares }} shares)</span>
+                </li>
+                <li>
+                  <span class="text-muted">Position value after buy:</span>
+                  <span class="fw-semibold text-danger">${{ trade_limit_modal.projected_value|floatformat:2|intcomma }}</span>
+                  <span class="text-muted small">({{ trade_limit_modal.projected_shares }} shares)</span>
+                </li>
+              {% endif %}
+              <li>
+                <span class="text-muted">Total equity (now):</span>
+                <span class="fw-semibold">${{ trade_limit_modal.total_equity|floatformat:2|intcomma }}</span>
+              </li>
+              <li>
+                <span class="text-muted">33% limit:</span>
+                <span class="fw-semibold">${{ trade_limit_modal.limit_33_value|floatformat:2|intcomma }}</span>
+              </li>
+              <li>
+                <span class="text-muted">Amount over 33%:</span>
+                <span class="fw-semibold text-danger">${{ trade_limit_modal.over_limit_value|floatformat:2|intcomma }}</span>
+              </li>
+              <li>
+                <span class="text-muted">Max additional shares allowed (32.9%):</span>
+                <span class="fw-semibold">{{ trade_limit_modal.max_additional_shares }}</span>
+                <span class="text-muted small">
+                  (max total {{ trade_limit_modal.max_total_shares }} shares ~${{ trade_limit_modal.max_total_value|floatformat:2|intcomma }})
+                </span>
+              </li>
+            </ul>
+          {% else %}
+            <div class="mb-2">
+              A single stock purchase cannot exceed <span class="fw-semibold">33%</span> of your total equity.
+            </div>
+            <div class="mb-0">
+              Close this window, reduce shares, and submit again.
+            </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      function syncLimitPriceEnabled() {
+        var orderTypeEl = document.getElementById("id_order_type");
+        var limitPriceEl = document.getElementById("id_limit_price");
+        if (!orderTypeEl || !limitPriceEl) return;
+
+        var isLimit = orderTypeEl.value === "LIMIT";
+        limitPriceEl.disabled = !isLimit;
+        if (!isLimit) {
+          limitPriceEl.value = "";
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        syncLimitPriceEnabled();
+        var orderTypeEl = document.getElementById("id_order_type");
+        if (orderTypeEl) {
+          orderTypeEl.addEventListener("change", syncLimitPriceEnabled);
+        }
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function normalizePrice(raw) {
+        if (!raw) return "";
+        var v = String(raw).trim();
+        if (!v) return "";
+        var n = Number(v);
+        if (Number.isNaN(n)) return "";
+        return n.toFixed(2);
+      }
+
+      var pageSize = 20;
+      var currentPage = 1;
+
+      function getAllRows() {
+        var table = document.getElementById("recentOrdersTable");
+        if (!table) return [];
+        return Array.from(table.querySelectorAll("tbody tr"));
+      }
+
+      function getMatchingRows() {
+        return getAllRows().filter(function (tr) {
+          return tr.dataset.matches === "1";
+        });
+      }
+
+      function setRowVisibilityForPage() {
+        var empty = document.getElementById("recentOrdersNoResults");
+        var pageInfo = document.getElementById("recentOrdersPageInfo");
+        var pager = document.getElementById("recentOrdersPager");
+        var pagination = document.getElementById("recentOrdersPagination");
+
+        var allRows = getAllRows();
+        var rows = getMatchingRows();
+        var total = rows.length;
+
+        var totalPages = Math.max(1, Math.ceil(total / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        // Hide all rows, then show the slice for the current page.
+        allRows.forEach(function (tr) {
+          tr.classList.add("d-none");
+        });
+
+        if (total === 0) {
+          if (empty) empty.classList.remove("d-none");
+          if (pagination) pagination.classList.add("d-none");
+          if (pageInfo) pageInfo.textContent = "Showing 0–0 of 0";
+          return;
+        }
+
+        if (empty) empty.classList.add("d-none");
+        if (pagination) pagination.classList.remove("d-none");
+
+        var startIdx = (currentPage - 1) * pageSize;
+        var endIdx = Math.min(total, startIdx + pageSize);
+        for (var i = startIdx; i < endIdx; i++) {
+          rows[i].classList.remove("d-none");
+        }
+
+        if (pageInfo) {
+          pageInfo.textContent = "Showing " + (startIdx + 1) + "–" + endIdx + " of " + total;
+        }
+
+        if (pager) {
+          var prevLi = pager.querySelector("[data-page='prev']")?.closest(".page-item");
+          var nextLi = pager.querySelector("[data-page='next']")?.closest(".page-item");
+          if (prevLi) prevLi.classList.toggle("disabled", currentPage === 1);
+          if (nextLi) nextLi.classList.toggle("disabled", currentPage === totalPages);
+        }
+      }
+
+      function applyOrderFilters() {
+        var form = document.getElementById("orderSearchForm");
+        var table = document.getElementById("recentOrdersTable");
+        if (!form || !table) return;
+
+        var placedDate = (form.querySelector("[name='placed_date']") || {}).value || "";
+        var symbol = ((form.querySelector("[name='symbol']") || {}).value || "").trim().toUpperCase();
+        var orderType = (form.querySelector("[name='order_type']") || {}).value || "";
+        var side = (form.querySelector("[name='side']") || {}).value || "";
+        var qty = ((form.querySelector("[name='quantity']") || {}).value || "").trim();
+        var status = (form.querySelector("[name='status']") || {}).value || "";
+        var price = normalizePrice((form.querySelector("[name='price']") || {}).value || "");
+
+        var rows = table.querySelectorAll("tbody tr");
+        rows.forEach(function (tr) {
+          var ok = true;
+          if (placedDate && tr.dataset.date !== placedDate) ok = false;
+          if (symbol && tr.dataset.symbol !== symbol) ok = false;
+          if (orderType && tr.dataset.orderType !== orderType) ok = false;
+          if (side && tr.dataset.side !== side) ok = false;
+          if (qty && String(tr.dataset.qty) !== qty) ok = false;
+          if (status && tr.dataset.status !== status) ok = false;
+          if (price) {
+            var sp = tr.dataset.submittedPrice || "";
+            var lp = tr.dataset.limitPrice || "";
+            if (sp !== price && lp !== price) ok = false;
+          }
+          tr.dataset.matches = ok ? "1" : "0";
+        });
+
+        currentPage = 1;
+        setRowVisibilityForPage();
+      }
+
+      function clearOrderFilters() {
+        var form = document.getElementById("orderSearchForm");
+        if (!form) return;
+        form.reset();
+        applyOrderFilters();
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var form = document.getElementById("orderSearchForm");
+        var clearBtn = document.getElementById("orderSearchClear");
+        var pager = document.getElementById("recentOrdersPager");
+
+        if (form) {
+          form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            applyOrderFilters();
+          });
+          form.addEventListener("change", applyOrderFilters);
+        }
+        if (clearBtn) {
+          clearBtn.addEventListener("click", function () {
+            clearOrderFilters();
+          });
+        }
+        if (pager) {
+          pager.addEventListener("click", function (e) {
+            var btn = e.target.closest("button[data-page]");
+            if (!btn) return;
+            var action = btn.getAttribute("data-page");
+            if (action === "prev") currentPage -= 1;
+            if (action === "next") currentPage += 1;
+            setRowVisibilityForPage();
+          });
+        }
+
+        // Apply current form values on first paint (supports server-rendered params too).
+        // Initialize matches=1 for all rows so pagination works even before filtering.
+        getAllRows().forEach(function (tr) {
+          tr.dataset.matches = "1";
+        });
+        setRowVisibilityForPage();
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var pendingCloseForm = null;
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var symbolEl = document.getElementById("closePosSymbol");
+        var qtyEl = document.getElementById("closePosQty");
+
+        document.querySelectorAll(".js-close-position").forEach(function (btn) {
+          btn.addEventListener("click", function (e) {
+            pendingCloseForm = e.target.closest("form");
+            if (symbolEl) symbolEl.textContent = btn.getAttribute("data-symbol") || "—";
+            if (qtyEl) qtyEl.textContent = btn.getAttribute("data-qty") || "—";
+          });
+        });
+
+        var confirmBtn = document.getElementById("confirmClosePositionBtn");
+        if (confirmBtn) {
+          confirmBtn.addEventListener("click", function () {
+            if (pendingCloseForm) {
+              pendingCloseForm.submit();
+            }
+          });
+        }
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      document.addEventListener("DOMContentLoaded", function () {
+        var msgEl = document.getElementById("tradeLimitServerMessage");
+        var modalEl = document.getElementById("tradeLimitModal");
+        var bodyEl = document.getElementById("tradeLimitModalBody");
+        if (!modalEl || !bodyEl || !window.bootstrap) return;
+
+        // Show modal if either the hidden message exists or the view provided structured modal data.
+        var shouldShow = false;
+        if (msgEl) {
+          var msg = (msgEl.textContent || "").trim();
+          // If the body is in fallback mode (no structured list), replace it with message text.
+          if (msg && bodyEl.querySelector("ul") === null) {
+            bodyEl.textContent = msg;
+          }
+          msgEl.classList.add("d-none");
+          shouldShow = true;
+        }
+        if (bodyEl.querySelector("ul")) {
+          shouldShow = true;
+        }
+        if (!shouldShow) return;
+
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+      });
+    })();
+  </script>
+
+{% endblock %}
+

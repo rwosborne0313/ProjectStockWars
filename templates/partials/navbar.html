@@ -1,0 +1,33 @@
+<nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom">
+  <div class="container">
+    <a class="navbar-brand fw-semibold" href="{% url 'competitions:landing' %}">Stock-Wars</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        {% if user.is_authenticated %}
+          <li class="nav-item"><a class="nav-link" href="{% url 'competitions:active_competitions' %}">All Competitions</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'competitions:my_competitions' %}">My competitions</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'simulator:dashboard' %}">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'marketdata:war_stream' %}">War Stream</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'simulator:watchlist' %}">Watchlist</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'accounts:profile' %}">Profile</a></li>
+          <li class="nav-item">
+            <form method="post" action="{% url 'logout' %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="nav-link border-0 bg-transparent">
+                Logout
+              </button>
+            </form>
+          </li>
+        {% else %}
+          <li class="nav-item"><a class="nav-link" href="{% url 'competitions:current_competitions' %}">Competitions</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'accounts:signup' %}">Sign up</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Login</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+

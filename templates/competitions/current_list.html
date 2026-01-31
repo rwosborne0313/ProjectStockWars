@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load tz humanize %}
+
+{% block title %}Current competitions | StockWars{% endblock %}
+
+{% block content %}
+  <div class="p-4 p-md-5 rounded-4 border bg-body-tertiary mb-4">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7">
+        <div class="text-uppercase small text-muted mb-2">Live trading competitions</div>
+        <h1 class="display-6 fw-semibold mb-2">Compete. Climb the leaderboard. Win.</h1>
+        <p class="lead mb-3">
+          Join a weekly Stock-Wars competition, trade with millions in virtual War Chest cash, and see how you rank in real time.
+          Many competitions offer <span class="fw-semibold">real cash and prizes</span> for top performers!
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          {% if user.is_authenticated %}
+            <a class="btn btn-primary" href="{% url 'competitions:active_competitions' %}">Join a competition</a>
+            <a class="btn btn-outline-secondary" href="{% url 'competitions:my_competitions' %}">View my competitions</a>
+          {% else %}
+            <a class="btn btn-primary" href="{% url 'accounts:signup' %}">Create a free account</a>
+            <a class="btn btn-outline-secondary" href="{% url 'login' %}">Log in</a>
+          {% endif %}
+        </div>
+        <div class="text-muted small mt-3">
+          Trades and simulations on Stock-Wars are not investment advice.
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-3 bg-primary-subtle text-primary p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M2 1a1 1 0 0 0-1 1v2a5 5 0 0 0 4 4.9V11H4a1 1 0 0 0-1 1v2h10v-2a1 1 0 0 0-1-1h-1V8.9A5 5 0 0 0 15 4V2a1 1 0 0 0-1-1H2zm12 3a4 4 0 0 1-3 3.87V2h3v2zM2 2h3v5.87A4 4 0 0 1 2 4V2z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="fw-semibold">You build your ranking and win!</div>
+                    <div class="text-muted small">See how you stack up against other traders!</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-3 bg-success-subtle text-success p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M0 0h1v15h15v1H0V0z"/>
+                      <path d="M10 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-1.793l-3.146 3.147a.5.5 0 0 1-.708 0l-1.647-1.647-3.646 3.647a.5.5 0 0 1-.708-.708l4-4a.5.5 0 0 1 .708 0l1.646 1.646L12.293 11H10.5a.5.5 0 0 1-.5-.5z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="fw-semibold">Fast and simple trading rules!</div>
+                    <div class="text-muted small">Market/limit orders, instant settlement, clear P&amp;L.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="rounded-3 bg-warning-subtle text-warning p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/>
+                      <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="fw-semibold">Build a watchlist, track movers, and go!</div>
+                    <div class="text-muted small">Open/High/Low/Last, change, and 52-week ranges.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex align-items-end justify-content-between mb-3">
+    <div>
+      <h1 class="h3 mb-1">Current competitions</h1>
+      <div class="text-muted small">
+        Browse all competitions currently running{% if competitions %} ({{ competitions|length }} live){% endif %}.
+      </div>
+    </div>
+    {% if user.is_authenticated %}
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'competitions:my_competitions' %}">My competitions</a>
+        <a class="btn btn-outline-primary" href="{% url 'competitions:active_competitions' %}">Join competitions</a>
+      </div>
+    {% else %}
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="{% url 'accounts:signup' %}">Create account</a>
+        <a class="btn btn-outline-secondary" href="{% url 'login' %}">Log in</a>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if competitions %}
+    <div class="row g-3">
+      {% for c in competitions %}
+        <div class="col-12 col-lg-6">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-wrap gap-3 justify-content-between align-items-center">
+              <div>
+                <div class="fw-semibold fs-5">{{ c.title }}</div>
+                <div class="text-muted small">{{ c.week_start_at|localtime }} → {{ c.week_end_at|localtime }}</div>
+                <div class="text-muted small">Sponsored by {{ c.sponsor.name }}</div>
+                {% if c.first_place_cash_prize or c.entry_fee or c.non_cash_prize %}
+                  <div class="mt-2 small">
+                    {% if c.first_place_cash_prize %}
+                      <span class="badge text-bg-success">1st: ${{ c.first_place_cash_prize|floatformat:2|intcomma }}</span>
+                    {% endif %}
+                    {% if c.entry_fee %}
+                      <span class="badge text-bg-secondary">Entry: ${{ c.entry_fee|floatformat:2|intcomma }}</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary">Free entry</span>
+                    {% endif %}
+                    {% if c.non_cash_prize %}
+                      <span class="badge text-bg-warning">Prize: {{ c.non_cash_prize }}</span>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-outline-primary" href="{% url 'competitions:competition_detail' c.id %}">Details</a>
+                {% if user.is_authenticated %}
+                  {% if c.id in joined_ids %}
+                    <a class="btn btn-primary" href="{% url 'simulator:dashboard_for_competition' c.id %}">Go to dashboard</a>
+                  {% else %}
+                    <a class="btn btn-primary" href="{% url 'competitions:join_competition' c.id %}">Join</a>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-muted">No competitions are currently running.</div>
+  {% endif %}
+{% endblock %}
+

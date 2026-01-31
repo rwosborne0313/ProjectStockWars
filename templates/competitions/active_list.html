@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load tz humanize %}
+
+{% block title %}Active competitions | StockWars{% endblock %}
+
+{% block content %}
+  <div class="d-flex align-items-end justify-content-between mb-3">
+    <div>
+      <h1 class="h3 mb-1">Active competitions</h1>
+      <div class="text-muted small">Join as many competitions as you want.</div>
+    </div>
+    <div>
+      <a class="btn btn-outline-secondary" href="{% url 'competitions:my_competitions' %}">My competitions</a>
+    </div>
+  </div>
+
+  {% if competitions %}
+    <div class="row g-4">
+      {% for c in competitions %}
+        <div class="col-12 col-md-6 col-xl-4">
+          <div class="card h-100 shadow-sm">
+            {% if c.hero_image %}
+              <img src="{{ c.hero_image.url }}" class="card-img-top object-fit-cover" style="height: 160px;" alt="{{ c.title }}">
+            {% elif c.sponsor.logo %}
+              <img src="{{ c.sponsor.logo.url }}" class="card-img-top object-fit-cover" style="height: 160px;" alt="{{ c.sponsor.name }}">
+            {% else %}
+              <div class="bg-body-tertiary d-flex align-items-center justify-content-center" style="height: 160px;">
+                <div class="text-center text-muted">
+                  <div class="fw-semibold">{{ c.title }}</div>
+                  <div class="small">Competition</div>
+                </div>
+              </div>
+            {% endif %}
+
+            <div class="card-body">
+              <h5 class="card-title mb-1">{{ c.title }}</h5>
+              <p class="card-text text-muted small mb-0">
+                Sponsored by <span class="fw-semibold">{{ c.sponsor.name }}</span>
+              </p>
+              {% if c.theme_name %}
+                <p class="card-text text-muted small mt-2 mb-0">{{ c.theme_name }}</p>
+              {% elif c.sponsor.description %}
+                <p class="card-text text-muted small mt-2 mb-0">{{ c.sponsor.description|truncatewords:22 }}</p>
+              {% endif %}
+            </div>
+
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item">
+                <span class="text-muted">Dates:</span>
+                <span class="fw-semibold">{{ c.week_start_at|localtime|date:"M j" }}–{{ c.week_end_at|localtime|date:"M j" }}</span>
+              </li>
+              <li class="list-group-item">
+                <span class="text-muted">Starting cash:</span>
+                <span class="fw-semibold">${{ c.starting_cash|floatformat:2|intcomma }}</span>
+              </li>
+              <li class="list-group-item">
+                <span class="text-muted">Entry fee:</span>
+                <span class="fw-semibold">
+                  {% if c.entry_fee %}${{ c.entry_fee|floatformat:2|intcomma }}{% else %}Free{% endif %}
+                </span>
+              </li>
+              <li class="list-group-item">
+                <span class="text-muted">Prizes:</span>
+                <div class="mt-1">
+                  {% if c.first_place_cash_prize %}
+                    <span class="badge text-bg-success">1st ${{ c.first_place_cash_prize|floatformat:2|intcomma }}</span>
+                  {% endif %}
+                  {% if c.second_place_cash_prize %}
+                    <span class="badge text-bg-success">2nd ${{ c.second_place_cash_prize|floatformat:2|intcomma }}</span>
+                  {% endif %}
+                  {% if c.third_place_cash_prize %}
+                    <span class="badge text-bg-success">3rd ${{ c.third_place_cash_prize|floatformat:2|intcomma }}</span>
+                  {% endif %}
+                  {% if c.non_cash_prize %}
+                    <span class="badge text-bg-warning">{{ c.non_cash_prize }}</span>
+                  {% endif %}
+                  {% if not c.first_place_cash_prize and not c.second_place_cash_prize and not c.third_place_cash_prize and not c.non_cash_prize %}
+                    <span class="text-muted small">Not listed</span>
+                  {% endif %}
+                </div>
+              </li>
+            </ul>
+
+            <div class="card-footer bg-transparent border-0 pt-0 mt-3">
+              <div class="d-flex gap-2">
+                <a class="btn btn-outline-primary w-50" href="{% url 'competitions:competition_detail' c.id %}">Details</a>
+                {% if c.id in joined_ids %}
+                  <a class="btn btn-primary w-50" href="{% url 'simulator:dashboard_for_competition' c.id %}">Go to dashboard</a>
+                {% else %}
+                  <a class="btn btn-primary w-50" href="{% url 'competitions:join_competition' c.id %}">Join</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-muted">No active competitions right now.</div>
+  {% endif %}
+{% endblock %}
+

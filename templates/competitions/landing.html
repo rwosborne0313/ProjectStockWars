@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load humanize static %}
+
+{% block title %}StockWars{% endblock %}
+
+{% block content %}
+  <div class="p-4 p-md-5 mb-4 rounded text-bg-dark">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7">
+        <h1 class="display-6 fw-bold mb-2">Stock-Wars: Plan, trade, and climb the leaderboard!</h1>
+        <p class="lead mb-3">
+          Join sponsored weekly trading competitions, start with <span class="fw-semibold">$10,000,000</span> simulated cash,
+          and compete for cash and prizes.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'competitions:current_competitions' %}" class="btn btn-primary btn-lg">
+            View all current competitions
+          </a>
+          {% if not user.is_authenticated %}
+            <a href="{% url 'accounts:signup' %}" class="btn btn-outline-light btn-lg">
+              Create your account
+            </a>
+          {% endif %}
+        </div>
+        <div class="mt-3 small text-white-50">
+          Some competitions may offer <span class="fw-semibold">thousands in real cash prizes</span> provided by sponsors—see each competition’s details.
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <img
+          src="{% static 'img/image.png' %}"
+          class="img-fluid rounded shadow-sm w-100 object-fit-cover"
+          alt="StockWars competition preview"
+        >
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="badge text-bg-primary mb-2">Fast</div>
+          <div class="fw-semibold mb-1">Instant settlement simulation</div>
+          <div class="text-muted">Buy/sell updates your cash and positions immediately.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="badge text-bg-success mb-2">Flexible</div>
+          <div class="fw-semibold mb-1">Trade any stock symbol</div>
+          <div class="text-muted">Build your own strategy—no restricted universe.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="badge text-bg-warning mb-2">Competitive</div>
+          <div class="fw-semibold mb-1">Ranked leaderboards</div>
+          <div class="text-muted">Track performance across competitions and switch dashboards anytime.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4 small text-muted">
+    Disclaimer: StockWars is a trading simulator for education and competition. It is not investment advice.
+    Past performance (simulated or otherwise) does not guarantee future results.
+  </div>
+{% endblock %}
+

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Contact Us | StockWars{% endblock %}
+
+{% block content %}
+  <div class="p-4 p-md-5 rounded-4 border bg-body-tertiary mb-4">
+    <div class="text-uppercase small text-muted mb-2">Contact</div>
+    <h1 class="display-6 fw-semibold mb-2">Contact Us</h1>
+    <p class="lead mb-0">
+      Questions about competitions, sponsorships, or your account? We’re happy to help.
+    </p>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="h5 fw-semibold">General support</h2>
+          <p class="text-muted mb-2">
+            Email: <a href="mailto:support@stockwars.example">support@stockwars.example</a>
+          </p>
+          <p class="text-muted mb-0">
+            Please include your competition name and the email address associated with your account.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="h5 fw-semibold">Sponsorships</h2>
+          <p class="text-muted mb-2">
+            Email: <a href="mailto:sponsors@stockwars.example">sponsors@stockwars.example</a>
+          </p>
+          <div class="small text-muted">
+            Interested in sponsoring a weekly competition? Reach out for packages and pricing.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
