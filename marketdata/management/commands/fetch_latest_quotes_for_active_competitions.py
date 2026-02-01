@@ -53,7 +53,7 @@ class Command(BaseCommand):
             )
         )
         instrument_ids |= set(
-            WatchlistItem.objects.filter(user_id__in=user_ids).values_list(
+            WatchlistItem.objects.filter(watchlist__user_id__in=user_ids).values_list(
                 "instrument_id", flat=True
             )
         )

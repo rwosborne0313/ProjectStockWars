@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -20,6 +21,17 @@ class ParticipantStatus(models.TextChoices):
 
 class ValuationPolicy(models.TextChoices):
     LATEST_CACHED = "LATEST_CACHED", "Latest cached quote"
+
+
+class CompetitionType(models.TextChoices):
+    STANDARD = "STANDARD", "Standard"
+    ADVANCED = "ADVANCED", "Advanced"
+
+
+class PriceSource(models.TextChoices):
+    LAST = "LAST", "Last"
+    BID = "BID", "Bid"
+    ASK = "ASK", "Ask"
 
 
 class Competition(models.Model):
@@ -55,6 +67,35 @@ class Competition(models.Model):
     valuation_policy = models.CharField(
         max_length=32, choices=ValuationPolicy.choices, default=ValuationPolicy.LATEST_CACHED
     )
+    competition_type = models.CharField(
+        max_length=16, choices=CompetitionType.choices, default=CompetitionType.STANDARD
+    )
+
+    # Advanced rule configuration (nullable so STANDARD competitions are unaffected)
+    max_single_symbol_pct = models.DecimalField(
+        max_digits=6, decimal_places=4, blank=True, null=True
+    )
+    max_symbols = models.PositiveIntegerField(blank=True, null=True)
+    min_symbols = models.PositiveIntegerField(blank=True, null=True)
+
+    # Market order pricing configuration (Advanced)
+    market_buy_price_source = models.CharField(
+        max_length=8, choices=PriceSource.choices, default=PriceSource.LAST
+    )
+
+    # Future enhancement (greyed out for now in admin)
+    allow_sell_short = models.BooleanField(default=False)
+
+    # Auto-close configuration (Advanced; executed via cron-friendly command)
+    auto_close_enabled = models.BooleanField(default=False)
+    auto_close_price_source = models.CharField(
+        max_length=8, choices=PriceSource.choices, default=PriceSource.LAST
+    )
+    synthetic_spread_bps = models.PositiveIntegerField(
+        default=10,
+        help_text="Synthetic bid/ask spread in basis points (1 bp = 0.01%). Used when Bid/Ask is selected.",
+    )
+    auto_close_processed_at = models.DateTimeField(blank=True, null=True)
     status = models.CharField(
         max_length=16, choices=CompetitionStatus.choices, default=CompetitionStatus.DRAFT
     )
@@ -69,6 +110,22 @@ class Competition(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    def clean(self) -> None:
+        super().clean()
+
+        if self.week_start_at and self.week_end_at and self.week_end_at <= self.week_start_at:
+            raise ValidationError({"week_end_at": "End time must be after start time."})
+
+        if self.min_symbols and self.max_symbols and self.min_symbols > self.max_symbols:
+            raise ValidationError({"min_symbols": "Min symbols must be <= max symbols."})
+
+        if self.max_single_symbol_pct is not None:
+            if self.max_single_symbol_pct <= 0 or self.max_single_symbol_pct > 1:
+                raise ValidationError({"max_single_symbol_pct": "Max % must be within (0, 1]."})
+
+        if self.synthetic_spread_bps is not None and self.synthetic_spread_bps < 0:
+            raise ValidationError({"synthetic_spread_bps": "Spread must be >= 0."})
 
     @property
     def is_active(self) -> bool:

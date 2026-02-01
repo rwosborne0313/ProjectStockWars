@@ -9,9 +9,11 @@ from django.utils import timezone
 
 from competitions.models import CompetitionParticipant, ParticipantStatus
 from competitions.models import CompetitionStatus
+from competitions.models import CompetitionType
 from marketdata.models import Quote
 from marketdata.services import fetch_and_store_latest_quote
 
+from .pricing import derive_price_from_source
 from .models import (
     CashLedgerEntry,
     CashLedgerReason,
@@ -27,6 +29,7 @@ from .models import (
 MONEY_QUANT = Decimal("0.01")
 MAX_SINGLE_BUY_PCT = Decimal("0.33")
 MAX_SINGLE_BUY_PCT_HINT = Decimal("0.329")
+PCT_HINT_DELTA = Decimal("0.001")
 
 
 @dataclass(frozen=True)
@@ -228,6 +231,8 @@ def execute_order(
             )
             return OrderExecutionResult(ok=False, order=order, fill=None, message="Competition not active.")
 
+        competition = participant.competition
+
         position = None
         try:
             position = Position.objects.select_for_update().get(
@@ -243,8 +248,51 @@ def execute_order(
                     participant=participant, instrument_id=instrument_id
                 )
 
+        existing_qty = int(position.quantity or 0)
+
+        # Advanced competitions may price MARKET buys at synthetic bid/ask instead of last.
+        if (
+            competition.competition_type == CompetitionType.ADVANCED
+            and side == OrderSide.BUY
+            and order_type == OrderType.MARKET
+        ):
+            fill_price = derive_price_from_source(
+                last_price=latest_quote.price,
+                price_source=competition.market_buy_price_source,
+                synthetic_spread_bps=int(competition.synthetic_spread_bps or 0),
+            )
+            notional = _quantize_money(fill_price * Decimal(quantity))
+
         # Validate resources
         if side == OrderSide.BUY:
+            # Advanced rule: max number of symbols (hard enforcement on BUY only).
+            if competition.competition_type == CompetitionType.ADVANCED and competition.max_symbols:
+                positions_count = Position.objects.filter(
+                    participant=participant, quantity__gt=0
+                ).count()
+                if existing_qty <= 0 and positions_count >= int(competition.max_symbols):
+                    order = Order.objects.create(
+                        participant=participant,
+                        instrument_id=instrument_id,
+                        side=side,
+                        order_type=order_type,
+                        quantity=quantity,
+                        limit_price=limit_price,
+                        status=OrderStatus.REJECTED,
+                        submitted_price=fill_price,
+                        quote_as_of=latest_quote.as_of,
+                        reject_reason="MAX_SYMBOLS_EXCEEDED",
+                    )
+                    return OrderExecutionResult(
+                        ok=False,
+                        order=order,
+                        fill=None,
+                        message=(
+                            f"This competition allows at most {int(competition.max_symbols)} symbols in your portfolio. "
+                            "Sell an existing position before buying a new symbol."
+                        ),
+                    )
+
             # Risk control: a single stock purchase must not exceed 33% of total equity
             # at the time of the trade. Equity is computed as cash + market value of positions
             # using the latest cached quotes (including the just-fetched quote for this symbol).
@@ -278,25 +326,49 @@ def execute_order(
 
             # If the user already owns this symbol, enforce the 33% limit against the
             # projected total position value (existing + new), not just the incremental buy.
-            existing_qty = int(position.quantity or 0)
             projected_qty = existing_qty + int(quantity)
             projected_position_value = _quantize_money(fill_price * Decimal(projected_qty))
 
-            limit_33 = _quantize_money(total_equity * MAX_SINGLE_BUY_PCT) if total_equity > 0 else Decimal("0.00")
-            if total_equity > 0 and projected_position_value > limit_33:
-                existing_position_value = _quantize_money(fill_price * Decimal(existing_qty)) if existing_qty else Decimal("0.00")
-                over = _quantize_money(projected_position_value - limit_33)
+            # Advanced competitions can override the max % per symbol, but the rule is disabled if max_symbols < 3.
+            apply_concentration_rule = True
+            max_pct = None
+            if competition.competition_type == CompetitionType.ADVANCED:
+                if competition.max_symbols and int(competition.max_symbols) < 3:
+                    apply_concentration_rule = False
+                max_pct = competition.max_single_symbol_pct
+            else:
+                max_pct = MAX_SINGLE_BUY_PCT
 
-                max_notional_329 = total_equity * MAX_SINGLE_BUY_PCT_HINT
+            if (
+                total_equity > 0
+                and apply_concentration_rule
+                and max_pct
+                and projected_position_value > _quantize_money(total_equity * Decimal(max_pct))
+            ):
+                existing_position_value = _quantize_money(fill_price * Decimal(existing_qty)) if existing_qty else Decimal("0.00")
+                limit_value = _quantize_money(total_equity * Decimal(max_pct))
+                over = _quantize_money(projected_position_value - limit_value)
+
+                max_pct_hint = (
+                    (Decimal(max_pct) - PCT_HINT_DELTA) if Decimal(max_pct) > PCT_HINT_DELTA else Decimal(max_pct)
+                )
+                max_notional_hint = total_equity * max_pct_hint
                 if fill_price and fill_price > 0:
                     max_total_shares_329 = int(
-                        (max_notional_329 / fill_price).to_integral_value(rounding=ROUND_FLOOR)
+                        (max_notional_hint / fill_price).to_integral_value(rounding=ROUND_FLOOR)
                     )
                 else:
                     max_total_shares_329 = 0
                 max_total_shares_329 = max(0, max_total_shares_329)
                 max_additional_shares_329 = max(0, max_total_shares_329 - existing_qty)
                 max_total_value_329 = _quantize_money(fill_price * Decimal(max_total_shares_329)) if fill_price else Decimal("0.00")
+
+                reject_reason = (
+                    "POSITION_SIZE_LIMIT_33PCT"
+                    if competition.competition_type != CompetitionType.ADVANCED
+                    and Decimal(max_pct) == MAX_SINGLE_BUY_PCT
+                    else "POSITION_SIZE_LIMIT_MAX_PCT"
+                )
 
                 order = Order.objects.create(
                     participant=participant,
@@ -308,26 +380,29 @@ def execute_order(
                     status=OrderStatus.REJECTED,
                     submitted_price=fill_price,
                     quote_as_of=latest_quote.as_of,
-                    reject_reason="POSITION_SIZE_LIMIT_33PCT",
+                    reject_reason=reject_reason,
                 )
                 return OrderExecutionResult(
                     ok=False,
                     order=order,
                     fill=None,
-                    message="Single stock purchases cannot exceed 33% of your total equity. Reduce shares and try again.",
+                    message="Single stock purchases cannot exceed the competition’s max % of your total equity. Reduce shares and try again.",
                     meta={
                         "symbol": getattr(inst, "symbol", None),
                         "quote_price": str(_quantize_money(fill_price)),
                         "trade_shares": int(quantity),
                         "trade_value": str(notional),
                         "total_equity": str(_quantize_money(total_equity)),
-                        "limit_33_value": str(limit_33),
+                        # keep legacy key for existing UI
+                        "limit_value": str(limit_value),
+                        "limit_33_value": str(limit_value),
                         "existing_shares": int(existing_qty),
                         "existing_value": str(existing_position_value),
                         "projected_shares": int(projected_qty),
                         "projected_value": str(projected_position_value),
                         "over_limit_value": str(over),
-                        "max_pct": str(MAX_SINGLE_BUY_PCT_HINT),
+                        "max_pct": str(max_pct),
+                        "max_pct_hint": str(max_pct_hint),
                         "max_total_shares": int(max_total_shares_329),
                         "max_additional_shares": int(max_additional_shares_329),
                         "max_total_value": str(max_total_value_329),
@@ -434,6 +509,21 @@ def execute_order(
                 reference_id=order.id,
             )
 
+        # Advanced rule: soft enforcement on SELL for minimum symbols.
+        # We allow the SELL to proceed but return a warning message if the user is now below the minimum.
+        warning_message = None
+        if (
+            side == OrderSide.SELL
+            and competition.competition_type == CompetitionType.ADVANCED
+            and competition.min_symbols
+        ):
+            remaining_symbols = Position.objects.filter(participant=participant, quantity__gt=0).count()
+            if remaining_symbols < int(competition.min_symbols):
+                warning_message = (
+                    f"Warning: this competition requires at least {int(competition.min_symbols)} symbols. "
+                    "You may be disqualified if you remain below the minimum."
+                )
+
         # Record a snapshot after every filled trade so the dashboard chart can show intraday movement.
         try:
             from leaderboards.services import create_portfolio_snapshot
@@ -447,6 +537,9 @@ def execute_order(
             ok=True,
             order=order,
             fill=fill,
-            message=f"Filled {side} {quantity} @ {fill_price} (quote as of {latest_quote.as_of}).",
+            message=(
+                f"Filled {side} {quantity} @ {fill_price} (quote as of {latest_quote.as_of})."
+                + (f" {warning_message}" if warning_message else "")
+            ),
         )
 

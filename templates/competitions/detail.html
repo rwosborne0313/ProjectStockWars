@@ -52,6 +52,37 @@
               <div class="text-muted small">Your rank is the only thing that matters!</div>
             </div>
           </div>
+
+          {% if competition.competition_type == "ADVANCED" %}
+            <hr class="my-3">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <span class="badge text-bg-dark">Advanced rules</span>
+              {% if competition.max_symbols %}
+                <span class="badge text-bg-secondary">Max symbols: {{ competition.max_symbols }}</span>
+              {% endif %}
+              {% if competition.min_symbols %}
+                <span class="badge text-bg-secondary">Min symbols: {{ competition.min_symbols }}</span>
+              {% endif %}
+              {% if competition.max_single_symbol_pct %}
+                <span class="badge text-bg-secondary">
+                  Max per symbol: {% widthratio competition.max_single_symbol_pct 1 100 %}%
+                </span>
+                {% if competition.max_symbols and competition.max_symbols < 3 %}
+                  <span class="badge text-bg-warning">Concentration disabled (&lt; 3 symbols)</span>
+                {% endif %}
+              {% endif %}
+              <span class="badge text-bg-secondary">Market BUY: {{ competition.market_buy_price_source }}</span>
+              {% if competition.auto_close_enabled %}
+                <span class="badge text-bg-secondary">Auto-close: {{ competition.auto_close_price_source }}</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Auto-close: Off</span>
+              {% endif %}
+            </div>
+            <div class="text-muted small mt-2">
+              Bid/Ask pricing uses a synthetic spread in this simulator.
+            </div>
+          {% endif %}
+
           {% if competition.first_place_cash_prize or competition.second_place_cash_prize or competition.third_place_cash_prize or competition.non_cash_prize or competition.entry_fee %}
             <hr class="my-3">
             <div class="row g-3">

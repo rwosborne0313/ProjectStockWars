@@ -11,6 +11,20 @@ from .models import OrderSide, OrderType
 from .models import OrderStatus
 
 
+class WatchlistCreateForm(forms.Form):
+    name = forms.CharField(max_length=100)
+    industry_label = forms.CharField(max_length=100, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update({"class": "form-control"})
+        self.fields["industry_label"].widget.attrs.update({"class": "form-control"})
+
+
+class WatchlistDeleteForm(forms.Form):
+    watchlist_id = forms.IntegerField(min_value=1)
+
+
 class TradeTicketForm(forms.Form):
     side = forms.ChoiceField(choices=OrderSide.choices)
     order_type = forms.ChoiceField(choices=OrderType.choices)
@@ -60,6 +74,7 @@ class TradeTicketForm(forms.Form):
 
 class WatchlistAddForm(forms.Form):
     symbol = forms.CharField(max_length=16)
+    watchlist_id = forms.IntegerField(min_value=1, required=False)
 
     def __init__(self, *args, participant=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -80,6 +95,7 @@ class WatchlistAddForm(forms.Form):
 
 class WatchlistRemoveForm(forms.Form):
     instrument_id = forms.IntegerField(min_value=1)
+    watchlist_id = forms.IntegerField(min_value=1, required=False)
 
 
 class OrderSearchForm(forms.Form):

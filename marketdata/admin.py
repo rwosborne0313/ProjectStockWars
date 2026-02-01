@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Instrument, Quote, WatchlistItem
+from .models import Instrument, Quote, Watchlist, WatchlistItem
 
 
 @admin.register(Instrument)
@@ -30,5 +30,15 @@ class QuoteAdmin(admin.ModelAdmin):
 
 @admin.register(WatchlistItem)
 class WatchlistItemAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "instrument", "created_at")
-    search_fields = ("user__username", "instrument__symbol")
+    list_display = ("id", "watchlist", "watchlist_user", "instrument", "created_at")
+    search_fields = ("watchlist__user__username", "watchlist__name", "instrument__symbol")
+
+    @admin.display(description="User")
+    def watchlist_user(self, obj: WatchlistItem):
+        return obj.watchlist.user if obj.watchlist_id else None
+
+
+@admin.register(Watchlist)
+class WatchlistAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "name", "industry_label", "updated_at")
+    search_fields = ("user__username", "user__email", "name", "industry_label")

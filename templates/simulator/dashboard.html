@@ -529,7 +529,11 @@
         <div class="modal-body" id="tradeLimitModalBody">
           {% if trade_limit_modal %}
             <div class="mb-2">
-              A single stock position cannot exceed <span class="fw-semibold">33%</span> of your total equity.
+              A single stock position cannot exceed
+              <span class="fw-semibold">
+                {% if trade_limit_modal.max_pct %}{% widthratio trade_limit_modal.max_pct 1 100 %}{% else %}33{% endif %}%
+              </span>
+              of your total equity.
             </div>
             <ul class="mb-0">
               <li>
@@ -556,15 +560,20 @@
                 <span class="fw-semibold">${{ trade_limit_modal.total_equity|floatformat:2|intcomma }}</span>
               </li>
               <li>
-                <span class="text-muted">33% limit:</span>
+                <span class="text-muted">
+                  {% if trade_limit_modal.max_pct %}{% widthratio trade_limit_modal.max_pct 1 100 %}{% else %}33{% endif %}% limit:
+                </span>
                 <span class="fw-semibold">${{ trade_limit_modal.limit_33_value|floatformat:2|intcomma }}</span>
               </li>
               <li>
-                <span class="text-muted">Amount over 33%:</span>
+                <span class="text-muted">Amount over limit:</span>
                 <span class="fw-semibold text-danger">${{ trade_limit_modal.over_limit_value|floatformat:2|intcomma }}</span>
               </li>
               <li>
-                <span class="text-muted">Max additional shares allowed (32.9%):</span>
+                <span class="text-muted">
+                  Max additional shares allowed
+                  ({% if trade_limit_modal.max_pct_hint %}{% widthratio trade_limit_modal.max_pct_hint 1 100 %}{% else %}32{% endif %}%):
+                </span>
                 <span class="fw-semibold">{{ trade_limit_modal.max_additional_shares }}</span>
                 <span class="text-muted small">
                   (max total {{ trade_limit_modal.max_total_shares }} shares ~${{ trade_limit_modal.max_total_value|floatformat:2|intcomma }})

@@ -34,6 +34,7 @@ class CompetitionAdmin(admin.ModelAdmin):
         "title",
         "sponsor",
         "status",
+        "competition_type",
         "week_start_at",
         "week_end_at",
         "starting_cash",
@@ -43,6 +44,7 @@ class CompetitionAdmin(admin.ModelAdmin):
     list_filter = ("status", "sponsor")
     search_fields = ("title", "sponsor__name")
     actions = (publish_competitions, lock_competitions, archive_competitions)
+    readonly_fields = ("allow_sell_short", "auto_close_processed_at")
 
     fieldsets = (
         (
@@ -52,6 +54,7 @@ class CompetitionAdmin(admin.ModelAdmin):
                     "title",
                     "sponsor",
                     "status",
+                    "competition_type",
                     "week_start_at",
                     "week_end_at",
                     "starting_cash",
@@ -75,6 +78,26 @@ class CompetitionAdmin(admin.ModelAdmin):
             {"fields": ("theme_name", "theme_primary_color", "hero_image", "rules_markdown")},
         ),
         ("Valuation", {"fields": ("valuation_policy",)}),
+        (
+            "Advanced rules",
+            {
+                "fields": (
+                    "max_symbols",
+                    "min_symbols",
+                    "max_single_symbol_pct",
+                    "market_buy_price_source",
+                    "synthetic_spread_bps",
+                    "allow_sell_short",
+                    "auto_close_enabled",
+                    "auto_close_price_source",
+                    "auto_close_processed_at",
+                ),
+                "description": (
+                    "Advanced rules apply only when Competition type is set to Advanced. "
+                    "Sell short is coming soon (disabled). Bid/Ask pricing uses a synthetic spread."
+                ),
+            },
+        ),
     )
 
 

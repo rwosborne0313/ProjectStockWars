@@ -61,9 +61,31 @@ class Quote(models.Model):
         return f"{self.instrument.symbol}@{self.as_of.isoformat()}"
 
 
-class WatchlistItem(models.Model):
+class Watchlist(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="watchlist_items"
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="watchlists"
+    )
+    name = models.CharField(max_length=100)
+    industry_label = models.CharField(max_length=100, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "name"], name="uniq_watchlist_user_name"),
+        ]
+        indexes = [
+            models.Index(fields=["user", "name"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id}:{self.name}"
+
+
+class WatchlistItem(models.Model):
+    watchlist = models.ForeignKey(
+        Watchlist, on_delete=models.CASCADE, related_name="items", null=True, blank=True
     )
     instrument = models.ForeignKey(
         Instrument, on_delete=models.CASCADE, related_name="+"
@@ -73,9 +95,9 @@ class WatchlistItem(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "instrument"], name="uniq_watchlist_user_instrument"
+                fields=["watchlist", "instrument"], name="uniq_watchlist_watchlist_instrument"
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.user_id}:{self.instrument.symbol}"
+        return f"{self.watchlist_id}:{self.instrument.symbol}"

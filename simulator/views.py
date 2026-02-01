@@ -7,15 +7,23 @@ from django.core.cache import cache
 from django.db.models import Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from competitions.models import CompetitionParticipant, CompetitionStatus, ParticipantStatus
 from leaderboards.models import PortfolioSnapshot
-from marketdata.models import Quote, WatchlistItem
+from marketdata.models import Quote, Watchlist, WatchlistItem
 from marketdata.providers import TwelveDataProvider
 from marketdata.services import fetch_and_store_latest_quote, get_or_create_instrument_by_symbol, normalize_symbol
 
-from .forms import OrderSearchForm, TradeTicketForm, WatchlistAddForm, WatchlistRemoveForm
+from .forms import (
+    OrderSearchForm,
+    TradeTicketForm,
+    WatchlistAddForm,
+    WatchlistCreateForm,
+    WatchlistDeleteForm,
+    WatchlistRemoveForm,
+)
 from .models import Order, OrderSide, OrderType, TradeFill
 from .services import execute_order
 
@@ -78,6 +86,12 @@ def dashboard_for_competition(request, competition_id: int):
         return redirect("competitions:competition_detail", competition_id=competition_id)
 
     if request.method == "POST":
+        def _ensure_default_watchlist() -> Watchlist:
+            wl = Watchlist.objects.filter(user=request.user).order_by("id").first()
+            if wl:
+                return wl
+            return Watchlist.objects.create(user=request.user, name="My Watchlist", industry_label="")
+
         if request.POST.get("action") == "positions_refresh":
             positions = list(
                 participant.positions.filter(quantity__gt=0).select_related("instrument")
@@ -115,8 +129,9 @@ def dashboard_for_competition(request, competition_id: int):
         if request.POST.get("action") == "watchlist_add":
             watchlist_add_form = WatchlistAddForm(request.POST, participant=participant)
             if watchlist_add_form.is_valid():
+                default_watchlist = _ensure_default_watchlist()
                 instrument = get_or_create_instrument_by_symbol(watchlist_add_form.cleaned_data["symbol"])
-                WatchlistItem.objects.get_or_create(user=request.user, instrument=instrument)
+                WatchlistItem.objects.get_or_create(watchlist=default_watchlist, instrument=instrument)
                 # Immediately refresh quote so the watchlist shows a price on the next render.
                 try:
                     fetch_and_store_latest_quote(instrument=instrument)
@@ -129,8 +144,9 @@ def dashboard_for_competition(request, competition_id: int):
             return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
 
         if request.POST.get("action") == "watchlist_refresh":
+            default_watchlist = _ensure_default_watchlist()
             watchlist_items = list(
-                WatchlistItem.objects.filter(user=request.user).select_related("instrument")
+                WatchlistItem.objects.filter(watchlist=default_watchlist).select_related("instrument")
             )
             refreshed = 0
             failed = 0
@@ -147,10 +163,11 @@ def dashboard_for_competition(request, competition_id: int):
             return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
 
         if request.POST.get("action") == "watchlist_remove":
+            default_watchlist = _ensure_default_watchlist()
             watchlist_remove_form = WatchlistRemoveForm(request.POST)
             if watchlist_remove_form.is_valid():
                 instrument_id = watchlist_remove_form.cleaned_data["instrument_id"]
-                WatchlistItem.objects.filter(user=request.user, instrument_id=instrument_id).delete()
+                WatchlistItem.objects.filter(watchlist=default_watchlist, instrument_id=instrument_id).delete()
                 messages.success(request, "Removed from watchlist.")
             else:
                 messages.error(request, "Could not remove from watchlist.")
@@ -170,7 +187,10 @@ def dashboard_for_competition(request, competition_id: int):
             if result.ok:
                 messages.success(request, result.message)
             else:
-                if getattr(result.order, "reject_reason", "") == "POSITION_SIZE_LIMIT_33PCT":
+                if getattr(result.order, "reject_reason", "") in {
+                    "POSITION_SIZE_LIMIT_33PCT",
+                    "POSITION_SIZE_LIMIT_MAX_PCT",
+                }:
                     # Persist details across redirect so the dashboard modal can render a breakdown.
                     if result.meta:
                         request.session["trade_limit_modal"] = result.meta
@@ -304,8 +324,9 @@ def dashboard_for_competition(request, competition_id: int):
         )
 
     # Watchlist
+    default_watchlist = Watchlist.objects.filter(user=request.user).order_by("id").first()
     watchlist_items = list(
-        WatchlistItem.objects.filter(user=request.user)
+        WatchlistItem.objects.filter(watchlist=default_watchlist) if default_watchlist else WatchlistItem.objects.none()
         .select_related("instrument")
         .order_by("instrument__symbol")
     )
@@ -326,7 +347,10 @@ def dashboard_for_competition(request, competition_id: int):
             }
         )
 
-    watchlist_add_form = WatchlistAddForm(participant=participant)
+    watchlist_add_form = WatchlistAddForm(
+        participant=participant,
+        initial={"watchlist_id": default_watchlist.id} if default_watchlist else None,
+    )
 
     joined_participants = (
         CompetitionParticipant.objects.filter(user=request.user)
@@ -455,20 +479,76 @@ def dashboard_for_competition(request, competition_id: int):
 
 @login_required
 def watchlist(request):
+    def _ensure_default_watchlist() -> Watchlist:
+        wl = Watchlist.objects.filter(user=request.user).order_by("id").first()
+        if wl:
+            return wl
+        return Watchlist.objects.create(user=request.user, name="My Watchlist", industry_label="")
+
+    def _get_active_watchlist() -> Watchlist:
+        try:
+            wid = int(request.GET.get("watchlist_id") or 0)
+        except (TypeError, ValueError):
+            wid = 0
+        if wid:
+            wl = Watchlist.objects.filter(id=wid, user=request.user).first()
+            if wl:
+                return wl
+        return _ensure_default_watchlist()
+
     if request.method == "POST":
+        if request.POST.get("action") == "watchlist_create":
+            create_form = WatchlistCreateForm(request.POST)
+            if create_form.is_valid():
+                name = (create_form.cleaned_data.get("name") or "").strip()
+                industry_label = (create_form.cleaned_data.get("industry_label") or "").strip()
+                if not name:
+                    messages.error(request, "Watchlist name is required.")
+                else:
+                    wl = Watchlist.objects.create(
+                        user=request.user, name=name, industry_label=industry_label
+                    )
+                    messages.success(request, f"Created watchlist “{wl.name}”.")
+                    return redirect(f"{reverse('simulator:watchlist')}?watchlist_id={wl.id}")
+            else:
+                messages.error(request, "Could not create watchlist.")
+            return redirect("simulator:watchlist")
+
+        if request.POST.get("action") == "watchlist_delete":
+            delete_form = WatchlistDeleteForm(request.POST)
+            if delete_form.is_valid():
+                wid = delete_form.cleaned_data["watchlist_id"]
+                wl = Watchlist.objects.filter(id=wid, user=request.user).first()
+                if not wl:
+                    messages.error(request, "Watchlist not found.")
+                    return redirect("simulator:watchlist")
+                remaining = Watchlist.objects.filter(user=request.user).exclude(id=wl.id).count()
+                if remaining <= 0:
+                    messages.error(request, "You must have at least one watchlist.")
+                    return redirect(f"{reverse('simulator:watchlist')}?watchlist_id={wl.id}")
+                wl.delete()
+                messages.success(request, "Watchlist deleted.")
+            else:
+                messages.error(request, "Could not delete watchlist.")
+            return redirect("simulator:watchlist")
+
         if request.POST.get("action") == "watchlist_add":
+            active_watchlist = _get_active_watchlist()
             form = WatchlistAddForm(request.POST)
             if form.is_valid():
                 instrument = get_or_create_instrument_by_symbol(form.cleaned_data["symbol"])
-                WatchlistItem.objects.get_or_create(user=request.user, instrument=instrument)
+                WatchlistItem.objects.get_or_create(watchlist=active_watchlist, instrument=instrument)
                 fetch_and_store_latest_quote(instrument=instrument)
-                messages.success(request, f"Added {instrument.symbol} to watchlist.")
+                messages.success(request, f"Added {instrument.symbol} to watchlist “{active_watchlist.name}”.")
             else:
                 messages.error(request, "Could not add to watchlist.")
-            return redirect("simulator:watchlist")
+            return redirect(f"{reverse('simulator:watchlist')}?watchlist_id={active_watchlist.id}")
 
         if request.POST.get("action") == "watchlist_refresh":
-            items = list(WatchlistItem.objects.filter(user=request.user).select_related("instrument"))
+            active_watchlist = _get_active_watchlist()
+            items = list(
+                WatchlistItem.objects.filter(watchlist=active_watchlist).select_related("instrument")
+            )
             refreshed = 0
             failed = 0
             for item in items:
@@ -478,26 +558,32 @@ def watchlist(request):
                 else:
                     refreshed += 1
             if refreshed:
-                messages.success(request, f"Refreshed {refreshed} watchlist quote(s).")
+                messages.success(request, f"Refreshed {refreshed} quote(s) for “{active_watchlist.name}”.")
             if failed:
                 messages.warning(request, f"Failed to refresh {failed} symbol(s). Try again soon.")
-            return redirect("simulator:watchlist")
+            return redirect(f"{reverse('simulator:watchlist')}?watchlist_id={active_watchlist.id}")
 
         if request.POST.get("action") == "watchlist_remove":
+            active_watchlist = _get_active_watchlist()
             form = WatchlistRemoveForm(request.POST)
             if form.is_valid():
                 WatchlistItem.objects.filter(
-                    user=request.user, instrument_id=form.cleaned_data["instrument_id"]
+                    watchlist=active_watchlist, instrument_id=form.cleaned_data["instrument_id"]
                 ).delete()
                 messages.success(request, "Removed from watchlist.")
             else:
                 messages.error(request, "Could not remove from watchlist.")
-            return redirect("simulator:watchlist")
+            return redirect(f"{reverse('simulator:watchlist')}?watchlist_id={active_watchlist.id}")
 
-    add_form = WatchlistAddForm()
+    active_watchlist = _get_active_watchlist()
+    all_watchlists = list(Watchlist.objects.filter(user=request.user).order_by("name", "id"))
+
+    add_form = WatchlistAddForm(initial={"watchlist_id": active_watchlist.id})
+    create_form = WatchlistCreateForm()
+    delete_form = WatchlistDeleteForm(initial={"watchlist_id": active_watchlist.id})
 
     items = list(
-        WatchlistItem.objects.filter(user=request.user)
+        WatchlistItem.objects.filter(watchlist=active_watchlist)
         .select_related("instrument")
         .order_by("instrument__symbol")
     )
@@ -548,6 +634,10 @@ def watchlist(request):
         request,
         "simulator/watchlist.html",
         {
+            "all_watchlists": all_watchlists,
+            "active_watchlist": active_watchlist,
+            "create_form": create_form,
+            "delete_form": delete_form,
             "add_form": add_form,
             "rows": rows,
             "watchlist_symbols": [r["symbol"] for r in rows],
@@ -561,14 +651,25 @@ def watchlist_timeseries(request):
     Return Twelve Data time_series OHLCV for a symbol in the user's watchlist.
     Used by the watchlist chart + history table.
     """
+    try:
+        watchlist_id = int(request.GET.get("watchlist_id") or 0)
+    except (TypeError, ValueError):
+        watchlist_id = 0
+
     raw_symbol = request.GET.get("symbol") or ""
     try:
         symbol = normalize_symbol(raw_symbol)
     except ValueError:
         return JsonResponse({"ok": False, "error": "INVALID_SYMBOL"}, status=400)
 
-    # Security: only allow symbols already on the user's watchlist
-    if not WatchlistItem.objects.filter(user=request.user, instrument__symbol=symbol).exists():
+    # Security: only allow symbols on the selected watchlist (and owned by this user)
+    if not watchlist_id:
+        return JsonResponse({"ok": False, "error": "WATCHLIST_REQUIRED"}, status=400)
+    if not Watchlist.objects.filter(id=watchlist_id, user=request.user).exists():
+        return JsonResponse({"ok": False, "error": "WATCHLIST_NOT_FOUND"}, status=404)
+    if not WatchlistItem.objects.filter(
+        watchlist_id=watchlist_id, instrument__symbol=symbol
+    ).exists():
         return JsonResponse({"ok": False, "error": "NOT_IN_WATCHLIST"}, status=403)
 
     interval = (request.GET.get("interval") or "1day").strip()
@@ -583,7 +684,7 @@ def watchlist_timeseries(request):
         outputsize = 90
     outputsize = max(10, min(outputsize, 365))
 
-    cache_key = f"watchlist_ts:{request.user.id}:{symbol}:{interval}:{outputsize}"
+    cache_key = f"watchlist_ts:{request.user.id}:{watchlist_id}:{symbol}:{interval}:{outputsize}"
     cached = cache.get(cache_key)
     if cached:
         return JsonResponse(cached)

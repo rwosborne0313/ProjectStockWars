@@ -45,7 +45,57 @@
       <form method="post" class="m-0">
         {% csrf_token %}
         <input type="hidden" name="action" value="watchlist_refresh">
+        <input type="hidden" name="watchlist_id" value="{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}">
         <button class="btn btn-outline-secondary" type="submit">Refresh</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-lg-6">
+          <label class="form-label mb-1">Active watchlist</label>
+          <select class="form-select" id="activeWatchlistSelect">
+            {% for wl in all_watchlists %}
+              <option value="{{ wl.id }}"{% if active_watchlist and wl.id == active_watchlist.id %} selected{% endif %}>
+                {{ wl.name }}{% if wl.industry_label %} ({{ wl.industry_label }}){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <div class="text-muted small mt-1">Switch watchlists to refresh the table + chart symbol list.</div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+          <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+            <form method="post" class="m-0">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="watchlist_delete">
+              <input type="hidden" name="watchlist_id" value="{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}">
+              <button class="btn btn-outline-danger" type="submit">Delete watchlist</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="post" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="watchlist_create">
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-1">New watchlist name</label>
+          {{ create_form.name }}
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-1">Industry label (optional)</label>
+          {{ create_form.industry_label }}
+        </div>
+        <div class="col-12 col-md-4">
+          <button class="btn btn-primary w-100" type="submit">Create watchlist</button>
+        </div>
       </form>
     </div>
   </div>
@@ -55,6 +105,7 @@
       <form method="post" class="row g-2 align-items-end">
         {% csrf_token %}
         <input type="hidden" name="action" value="watchlist_add">
+        <input type="hidden" name="watchlist_id" value="{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}">
         <div class="col-12 col-md-6">
           <label class="form-label mb-1">Add symbol</label>
           {{ add_form.symbol }}
@@ -170,6 +221,7 @@
                     <form method="post" class="d-inline">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="watchlist_remove">
+                      <input type="hidden" name="watchlist_id" value="{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}">
                       <input type="hidden" name="instrument_id" value="{{ r.instrument_id }}">
                       <button class="btn btn-sm btn-outline-secondary" type="submit">Remove</button>
                     </form>
@@ -362,7 +414,8 @@
         hideAlert();
         showAlert("Loading…", "alert-secondary");
         try {
-          var url = "{% url 'simulator:watchlist_timeseries' %}?symbol=" + encodeURIComponent(symbol) + "&interval=1day&outputsize=120";
+          var watchlistId = "{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}";
+          var url = "{% url 'simulator:watchlist_timeseries' %}?watchlist_id=" + encodeURIComponent(watchlistId) + "&symbol=" + encodeURIComponent(symbol) + "&interval=1day&outputsize=120";
           var resp = await fetch(url, { headers: { "Accept": "application/json" } });
           var payload = await resp.json();
           if (!resp.ok || !payload || !payload.ok) {
@@ -401,6 +454,18 @@
       if (symbolEl.value) {
         loadSeries(symbolEl.value);
       }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var sel = document.getElementById("activeWatchlistSelect");
+      if (!sel) return;
+      sel.addEventListener("change", function () {
+        var wid = sel.value;
+        if (!wid) return;
+        window.location.href = "{% url 'simulator:watchlist' %}?watchlist_id=" + encodeURIComponent(wid);
+      });
     })();
   </script>
 {% endblock %}
