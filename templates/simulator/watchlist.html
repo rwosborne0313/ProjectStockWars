@@ -38,25 +38,25 @@
 {% block content %}
   <div class="d-flex align-items-end justify-content-between mb-3">
     <div>
-      <h1 class="h3 mb-1">Watchlist</h1>
-      <div class="text-muted small">Track more symbols with a dedicated watchlist page.</div>
+      <h1 class="h3 mb-1">My Watchlists</h1>
+      <div class="text-muted small">Track symbols with a dedicated watchlist page.</div>
     </div>
     <div class="d-flex gap-2">
       <form method="post" class="m-0">
         {% csrf_token %}
         <input type="hidden" name="action" value="watchlist_refresh">
         <input type="hidden" name="watchlist_id" value="{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}">
-        <button class="btn btn-outline-secondary" type="submit">Refresh</button>
+        <button class="btn btn-sm btn-outline-secondary" type="submit">Refresh</button>
       </form>
     </div>
   </div>
 
-  <div class="card mb-3">
-    <div class="card-body">
-      <div class="row g-3 align-items-end">
-        <div class="col-12 col-lg-6">
-          <label class="form-label mb-1">Active watchlist</label>
-          <select class="form-select" id="activeWatchlistSelect">
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <label class="form-label mb-1 small">Select Active Watchlist</label>
+          <select class="form-select form-select-sm" id="activeWatchlistSelect">
             {% for wl in all_watchlists %}
               <option value="{{ wl.id }}"{% if active_watchlist and wl.id == active_watchlist.id %} selected{% endif %}>
                 {{ wl.name }}{% if wl.industry_label %} ({{ wl.industry_label }}){% endif %}
@@ -64,59 +64,61 @@
             {% endfor %}
           </select>
           <div class="text-muted small mt-1">Switch watchlists to refresh the table + chart symbol list.</div>
-        </div>
 
-        <div class="col-12 col-lg-6">
-          <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+          <div class="mt-2">
             <form method="post" class="m-0">
               {% csrf_token %}
               <input type="hidden" name="action" value="watchlist_delete">
               <input type="hidden" name="watchlist_id" value="{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}">
-              <button class="btn btn-outline-danger" type="submit">Delete watchlist</button>
+              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
             </form>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="card mb-3">
-    <div class="card-body">
-      <form method="post" class="row g-2 align-items-end">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="watchlist_create">
-        <div class="col-12 col-md-4">
-          <label class="form-label mb-1">New watchlist name</label>
-          {{ create_form.name }}
+    <div class="col-12 col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <form method="post" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="watchlist_create">
+            <div class="col-12">
+              <label class="form-label mb-1 small">Create a New Watchlist</label>
+              {{ create_form.name }}
+            </div>
+            <div class="col-12">
+              <label class="form-label mb-1 small">Specific Industry Label (optional)</label>
+              {{ create_form.industry_label }}
+            </div>
+            <div class="col-12">
+              <button class="btn btn-sm btn-primary w-100" type="submit">Create</button>
+            </div>
+          </form>
         </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label mb-1">Industry label (optional)</label>
-          {{ create_form.industry_label }}
-        </div>
-        <div class="col-12 col-md-4">
-          <button class="btn btn-primary w-100" type="submit">Create watchlist</button>
-        </div>
-      </form>
+      </div>
     </div>
-  </div>
 
-  <div class="card mb-3">
-    <div class="card-body">
-      <form method="post" class="row g-2 align-items-end">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="watchlist_add">
-        <input type="hidden" name="watchlist_id" value="{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}">
-        <div class="col-12 col-md-6">
-          <label class="form-label mb-1">Add symbol</label>
-          {{ add_form.symbol }}
-          {% if add_form.symbol.errors %}
-            <div class="text-danger small">{{ add_form.symbol.errors }}</div>
-          {% endif %}
+    <div class="col-12 col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <form method="post" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="watchlist_add">
+            <input type="hidden" name="watchlist_id" value="{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}">
+            <div class="col-8">
+              <label class="form-label mb-1 small">Add Symbol to Current Watchlist</label>
+              {{ add_form.symbol }}
+              {% if add_form.symbol.errors %}
+                <div class="text-danger small">{{ add_form.symbol.errors }}</div>
+              {% endif %}
+            </div>
+            <div class="col-4">
+              <button class="btn btn-sm btn-primary w-100" type="submit">Add</button>
+            </div>
+          </form>
         </div>
-        <div class="col-12 col-md-3">
-          <button class="btn btn-primary w-100" type="submit">Add to watchlist</button>
-        </div>
-      </form>
+      </div>
     </div>
   </div>
 
@@ -130,7 +132,7 @@
         <div class="d-flex flex-wrap gap-2 align-items-end">
           <div>
             <label class="form-label mb-1 small">Symbol</label>
-            <select class="form-select" id="chartSymbol">
+          <select class="form-select form-select-sm" id="chartSymbol">
               <option value="">Select…</option>
               {% for sym in watchlist_symbols %}
                 <option value="{{ sym }}"{% if forloop.first %} selected{% endif %}>{{ sym }}</option>
@@ -139,7 +141,7 @@
           </div>
           <div>
             <label class="form-label mb-1 small">Y axis</label>
-            <select class="form-select" id="chartMetric">
+          <select class="form-select form-select-sm" id="chartMetric">
               <option value="close" selected>Close</option>
               <option value="open">Open</option>
               <option value="high">High</option>
@@ -399,7 +401,8 @@
             scales: {
               x: {
                 title: { display: true, text: "Close date" },
-                ticks: { maxTicksLimit: 10 }
+                // Force daily tick labels (vs. auto-skipping to ~2-week steps)
+                ticks: { autoSkip: false, maxTicksLimit: 31 }
               },
               y: {
                 title: { display: true, text: metric.toUpperCase() }
@@ -415,7 +418,8 @@
         showAlert("Loading…", "alert-secondary");
         try {
           var watchlistId = "{% if active_watchlist %}{{ active_watchlist.id }}{% endif %}";
-          var url = "{% url 'simulator:watchlist_timeseries' %}?watchlist_id=" + encodeURIComponent(watchlistId) + "&symbol=" + encodeURIComponent(symbol) + "&interval=1day&outputsize=120";
+          // Pull ~1 month so daily labels are readable.
+          var url = "{% url 'simulator:watchlist_timeseries' %}?watchlist_id=" + encodeURIComponent(watchlistId) + "&symbol=" + encodeURIComponent(symbol) + "&interval=1day&outputsize=31";
           var resp = await fetch(url, { headers: { "Accept": "application/json" } });
           var payload = await resp.json();
           if (!resp.ok || !payload || !payload.ok) {

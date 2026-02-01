@@ -42,6 +42,23 @@
     </div>
   </div>
 
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-body-tertiary fw-semibold">5-minute chart</div>
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-2">
+        <div class="small text-muted">
+          Click a row in the live feed to chart that symbol.
+        </div>
+        <div class="small">
+          Chart symbol: <span class="fw-semibold" id="wsChartSymbol">—</span>
+        </div>
+      </div>
+      <div class="position-relative" style="height: 240px;">
+        <canvas id="wsChart"></canvas>
+      </div>
+    </div>
+  </div>
+
   <div class="card shadow-sm">
     <div class="card-header bg-body-tertiary fw-semibold">Live feed</div>
     <div class="card-body p-0">
@@ -66,6 +83,8 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <script>
     (function () {
       var statusEl = document.getElementById("wsStatus");
@@ -76,11 +95,18 @@
       var clearBtn = document.getElementById("wsClearBtn");
       var tbody = document.getElementById("wsTbody");
       var emptyRow = document.getElementById("wsEmptyRow");
+      var chartCanvas = document.getElementById("wsChart");
+      var chartSymbolEl = document.getElementById("wsChartSymbol");
 
       if (!statusEl || !symbolsEl || !connectBtn || !disconnectBtn || !clearBtn || !tbody) return;
 
       var ws = null;
       var lastPriceBySymbol = {};
+      var selectedSymbol = null;
+      var priceHistoryBySymbol = {}; // symbol -> [{x: ms, y: price}]
+      var chart = null;
+      var CHART_WINDOW_MS = 5 * 60 * 1000;
+      var lastChartTsBySymbol = {}; // symbol -> last x used (ms)
 
       function setStatus(text) {
         statusEl.textContent = text;
@@ -141,6 +167,108 @@
         );
       }
 
+      function fmtTimeHms(ms) {
+        var dt = new Date(ms);
+        return pad2(dt.getHours()) + ":" + pad2(dt.getMinutes()) + ":" + pad2(dt.getSeconds());
+      }
+
+      function ensureChart() {
+        if (!chartCanvas || !window.Chart) return null;
+        if (chart) return chart;
+
+        chart = new Chart(chartCanvas, {
+          type: "line",
+          data: {
+            datasets: [
+              {
+                label: "Price",
+                data: [],
+                parsing: false,
+                borderColor: "rgba(13,110,253,0.95)",
+                backgroundColor: "rgba(13,110,253,0.10)",
+                pointRadius: 0,
+                tension: 0.15,
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            normalized: true,
+            // Keep animations short so rapid ticks still feel responsive.
+            animation: { duration: 80, easing: "linear" },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: function (items) {
+                    if (!items || !items.length) return "";
+                    var x = items[0].parsed && items[0].parsed.x;
+                    return x ? fmtTimeHms(x) : "";
+                  },
+                  label: function (ctx) {
+                    var y = ctx.parsed && ctx.parsed.y;
+                    return " " + fmtMoney(y);
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                type: "linear",
+                title: { display: true, text: "Time (last 5 minutes)" },
+                ticks: {
+                  maxTicksLimit: 6,
+                  callback: function (value) {
+                    return fmtTimeHms(Number(value));
+                  },
+                },
+              },
+              y: {
+                title: { display: true, text: "Price" },
+                ticks: {
+                  callback: function (value) {
+                    return fmtMoney(Number(value));
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        return chart;
+      }
+
+      function pruneHistory(symbol, nowMs) {
+        var arr = priceHistoryBySymbol[symbol];
+        if (!arr || !arr.length) return;
+        var minTs = nowMs - CHART_WINDOW_MS;
+        while (arr.length && arr[0].x < minTs) {
+          arr.shift();
+        }
+      }
+
+      function setSelectedSymbol(sym) {
+        selectedSymbol = sym;
+        if (chartSymbolEl) chartSymbolEl.textContent = sym || "—";
+
+        // Highlight selected row
+        Array.from(tbody.querySelectorAll("tr[data-symbol]")).forEach(function (tr) {
+          if (tr.dataset && tr.dataset.symbol === sym) tr.classList.add("table-primary");
+          else tr.classList.remove("table-primary");
+        });
+
+        var c = ensureChart();
+        if (!c) return;
+        var series = (priceHistoryBySymbol[sym] || []).slice();
+        c.data.datasets[0].data = series;
+        var now = Date.now();
+        c.options.scales.x.min = now - CHART_WINDOW_MS;
+        c.options.scales.x.max = now;
+        c.update();
+      }
+
       function ensureRow(symbol) {
         var id = "ws-row-" + symbol;
         var row = document.getElementById(id);
@@ -150,6 +278,11 @@
 
         row = document.createElement("tr");
         row.id = id;
+        row.dataset.symbol = symbol;
+        row.style.cursor = "pointer";
+        row.addEventListener("click", function () {
+          setSelectedSymbol(symbol);
+        });
 
         row.innerHTML =
           '<td class="ps-3 fw-semibold">' + symbol + '</td>' +
@@ -189,6 +322,31 @@
         if (priceEl) priceEl.textContent = fmtMoney(price);
         if (changeEl) changeEl.textContent = (change === null) ? "—" : fmtMoney(change);
         if (timeEl) timeEl.textContent = formatTimestampMs(ts || Date.now());
+
+        // Buffer for 5-minute chart
+        // IMPORTANT: Twelve Data WS `timestamp` often advances on candle boundaries; to
+        // plot a point for every incoming message, use client receipt time.
+        var nowMs = Date.now();
+        var lastTs = lastChartTsBySymbol[symbol];
+        if (lastTs !== undefined && nowMs <= lastTs) {
+          nowMs = lastTs + 1; // ensure strictly increasing x
+        }
+        lastChartTsBySymbol[symbol] = nowMs;
+        if (!priceHistoryBySymbol[symbol]) priceHistoryBySymbol[symbol] = [];
+        priceHistoryBySymbol[symbol].push({ x: nowMs, y: price });
+        pruneHistory(symbol, nowMs);
+
+        // Update chart if this symbol is selected
+        if (selectedSymbol === symbol) {
+          var c = ensureChart();
+          if (c) {
+            c.data.datasets[0].data = priceHistoryBySymbol[symbol].slice();
+            c.options.scales.x.min = nowMs - CHART_WINDOW_MS;
+            c.options.scales.x.max = nowMs;
+            // Force an immediate redraw per tick (otherwise rapid updates can appear throttled).
+            c.update("none");
+          }
+        }
       }
 
       function handleUpstream(msg) {
@@ -322,8 +480,16 @@
 
       function clearTable() {
         lastPriceBySymbol = {};
+        priceHistoryBySymbol = {};
+        selectedSymbol = null;
+        lastChartTsBySymbol = {};
         tbody.innerHTML = '<tr id="wsEmptyRow"><td class="ps-3 text-muted" colspan="5">No data yet.</td></tr>';
         emptyRow = document.getElementById("wsEmptyRow");
+        if (chartSymbolEl) chartSymbolEl.textContent = "—";
+        if (chart) {
+          chart.data.datasets[0].data = [];
+          chart.update();
+        }
       }
 
       connectBtn.addEventListener("click", connectAndSubscribe);
