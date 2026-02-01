@@ -6,6 +6,9 @@ Online stock trading simulator built with **Python + Django + Django Templates +
 
 ## TwelveData API Key = 24512fc688324e809779b067b411d418
 
+## rwosborne330, rwosborne3302, rwosborne3303, tprice (weaverofwishes001!)
+## stockwars, stockwars - Django Admin
+
 ### Dependencies
 
 ```bash
