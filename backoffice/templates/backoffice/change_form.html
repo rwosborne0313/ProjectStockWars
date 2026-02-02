@@ -1,0 +1,115 @@
+{% extends "backoffice/base.html" %}
+
+{% block backoffice_title %}
+  {% if obj %}Edit {{ item.verbose_name|capfirst }}{% else %}Add {{ item.verbose_name|capfirst }}{% endif %}
+{% endblock %}
+
+{% block backoffice_content %}
+  <div class="card shadow-sm">
+    <div class="card-header bg-body-tertiary d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="fw-semibold">
+        {% if obj %}Edit{% else %}Add{% endif %} {{ item.verbose_name|capfirst }}
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'backoffice:changelist' item.app_label item.model_name %}">Back</a>
+        {% if can_delete %}
+          <a class="btn btn-sm btn-outline-danger" href="{% url 'backoffice:delete' item.app_label item.model_name obj.pk %}">Delete</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="row g-3">
+          {% for field in form %}
+            <div class="col-12 col-md-6">
+              <label class="form-label small">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+              {% endif %}
+              {% for err in field.errors %}
+                <div class="text-danger small">{{ err }}</div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+
+        {% if inline_formsets %}
+          <hr class="my-4">
+          <div class="fw-semibold mb-2">Related</div>
+          <div class="d-flex flex-column gap-3">
+            {% for x in inline_formsets %}
+              <div class="card backoffice-inline">
+                <div class="card-header bg-body-tertiary fw-semibold">
+                  {{ x.inline.opts.verbose_name_plural|capfirst }}
+                </div>
+                <div class="card-body">
+                  {{ x.formset.management_form }}
+                  {% if x.formset.non_form_errors %}
+                    <div class="alert alert-danger">{{ x.formset.non_form_errors }}</div>
+                  {% endif %}
+
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                      <thead>
+                        <tr>
+                          {% for f in x.formset.empty_form.visible_fields %}
+                            <th>{{ f.label }}</th>
+                          {% endfor %}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for f in x.formset.forms %}
+                          <tr>
+                            {% for hf in f.hidden_fields %}
+                              {{ hf }}
+                            {% endfor %}
+                            {% for vf in f.visible_fields %}
+                              <td>
+                                {{ vf }}
+                                {% for err in vf.errors %}
+                                  <div class="text-danger small">{{ err }}</div>
+                                {% endfor %}
+                              </td>
+                            {% endfor %}
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <button class="btn btn-primary" type="submit">Save</button>
+          <button class="btn btn-outline-primary" type="submit" name="_continue" value="1">Save and continue</button>
+          <a class="btn btn-outline-secondary" href="{% url 'backoffice:changelist' item.app_label item.model_name %}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Add Bootstrap classes to inputs in this form (keeps parity with ModelAdmin forms).
+    (function () {
+      document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll(".backoffice form input, .backoffice form select, .backoffice form textarea").forEach(function (el) {
+          if (el.type === "checkbox" || el.type === "radio") return;
+          if (el.classList.contains("form-control") || el.classList.contains("form-select")) return;
+          if (el.tagName === "SELECT") el.classList.add("form-select");
+          else el.classList.add("form-control");
+        });
+      });
+    })();
+  </script>
+{% endblock %}
+

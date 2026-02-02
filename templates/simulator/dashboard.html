@@ -26,7 +26,20 @@
   <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
     <div>
       <div class="text-muted small">Active competition</div>
-      <div class="h4 mb-0">{{ participant.competition.title }}</div>
+      <div class="h4 mb-0 d-flex flex-wrap align-items-center gap-2">
+        <span>{{ participant.competition.title }}</span>
+        <span
+          id="competitionCountdownBadge"
+          class="badge rounded-pill {% if competition_is_over %}text-bg-secondary{% else %}text-bg-primary{% endif %}"
+          data-competition-end="{{ competition_end_iso }}"
+        >
+          {% if competition_is_over %}
+            Competition completed
+          {% else %}
+            <span id="competitionCountdownText">Calculating…</span>
+          {% endif %}
+        </span>
+      </div>
       {% if joined_participants %}
         <div class="mt-2">
           <div class="dropdown">
@@ -58,6 +71,70 @@
       </div>
     </div>
   </div>
+
+  <script>
+    (function () {
+      function pad2(n) {
+        return String(n).padStart(2, "0");
+      }
+
+      function formatRemaining(ms) {
+        var totalSeconds = Math.max(0, Math.floor(ms / 1000));
+        var days = Math.floor(totalSeconds / 86400);
+        var rem = totalSeconds % 86400;
+        var hours = Math.floor(rem / 3600);
+        rem = rem % 3600;
+        var minutes = Math.floor(rem / 60);
+        var seconds = rem % 60;
+        return days + "d " + pad2(hours) + "h " + pad2(minutes) + "m " + pad2(seconds) + "s";
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var badge = document.getElementById("competitionCountdownBadge");
+        if (!badge) return;
+
+        var endIso = badge.getAttribute("data-competition-end");
+        if (!endIso) return;
+
+        // Robust parse: Django provides an ISO string (usually with timezone offset).
+        // Avoid escapejs here so the attribute isn't polluted with backslashes.
+        var endMs = Date.parse(endIso);
+        if (!Number.isFinite(endMs)) {
+          // Fallback for any unexpected formatting (e.g. space-separated).
+          endMs = Date.parse(String(endIso).replace(" ", "T"));
+        }
+        if (!Number.isFinite(endMs)) return;
+
+        var textEl = document.getElementById("competitionCountdownText");
+
+        function setCompleted() {
+          badge.classList.remove("text-bg-primary");
+          badge.classList.add("text-bg-secondary");
+          badge.textContent = "Competition completed";
+        }
+
+        function tick() {
+          var now = Date.now();
+          var remaining = endMs - now;
+          if (remaining <= 0) {
+            setCompleted();
+            return;
+          }
+          if (textEl) {
+            textEl.textContent = formatRemaining(remaining);
+          } else {
+            // Fallback if the inner span is missing (e.g. after a rerender).
+            badge.textContent = formatRemaining(remaining);
+          }
+          window.setTimeout(tick, 250);
+        }
+
+        // If server rendered as completed, keep it; otherwise start ticking.
+        if ((badge.textContent || "").toLowerCase().indexOf("completed") !== -1) return;
+        tick();
+      });
+    })();
+  </script>
 
   <div class="row g-4">
     <div class="col-12 col-lg-6">

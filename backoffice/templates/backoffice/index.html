@@ -1,0 +1,35 @@
+{% extends "backoffice/base.html" %}
+
+{% block backoffice_title %}Overview{% endblock %}
+
+{% block backoffice_content %}
+  <div class="card shadow-sm">
+    <div class="card-header bg-body-tertiary fw-semibold">Registered models</div>
+    <div class="card-body">
+      <div class="text-muted small mb-3">
+         Data model administration for Stock-Wars is administered through platform engineering.
+      </div>
+
+      <div class="row g-3">
+        {% for app_label, items in nav_tree.items %}
+          <div class="col-12 col-lg-6 col-xxl-4">
+            <div class="border rounded-3 p-3 h-100">
+              <div class="fw-semibold mb-2 text-capitalize">{{ app_label }}</div>
+              <div class="d-flex flex-column gap-1">
+                {% for it in items %}
+                  <a class="link-primary text-decoration-none"
+                     href="{% url 'backoffice:changelist' it.app_label it.model_name %}">
+                    {{ it.verbose_name_plural|capfirst }}
+                  </a>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <div class="text-muted">No models available for your permissions.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

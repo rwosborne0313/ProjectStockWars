@@ -1,0 +1,27 @@
+.backoffice .backoffice-sidebar .list-group-item {
+  border-left: 0;
+  border-right: 0;
+}
+
+.backoffice .backoffice-sidebar .list-group-item-action {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
+.backoffice .backoffice-sidebar .list-group-item.active {
+  font-weight: 700;
+}
+
+.backoffice .table td,
+.backoffice .table th {
+  vertical-align: middle;
+}
+
+.backoffice a.link-primary {
+  font-weight: 600;
+}
+
+.backoffice .backoffice-inline .table td {
+  min-width: 140px;
+}
+

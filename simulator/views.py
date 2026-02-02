@@ -451,6 +451,9 @@ def dashboard_for_competition(request, competition_id: int):
     }
 
     trade_limit_modal = request.session.pop("trade_limit_modal", None)
+    competition_end_at = participant.competition.week_end_at
+    competition_is_over = now >= competition_end_at
+    competition_end_iso = timezone.localtime(competition_end_at).isoformat()
 
     return render(
         request,
@@ -473,6 +476,8 @@ def dashboard_for_competition(request, competition_id: int):
             "watchlist_add_form": watchlist_add_form,
             "ranking_card": ranking_card,
             "trade_limit_modal": trade_limit_modal,
+            "competition_end_iso": competition_end_iso,
+            "competition_is_over": competition_is_over,
         },
     )
 

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Backoffice | StockWars{% endblock %}
+
+{% block content %}
+  <link rel="stylesheet" href="{% static 'backoffice/backoffice.css' %}">
+
+  <div class="backoffice">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+      <div>
+        <div class="text-uppercase small text-muted">Backoffice</div>
+        <div class="h4 mb-0">{% block backoffice_title %}Admin{% endblock %}</div>
+      </div>
+      <div class="small text-muted">
+        Logged in as <span class="fw-semibold">{{ request.user.username }}</span>
+        <span class="mx-2">·</span>
+        <a class="text-muted text-decoration-none" href="{% url 'backoffice:logout' %}">Logout</a>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-3 col-xxl-2">
+        <div class="card shadow-sm backoffice-sidebar">
+          <div class="card-header bg-body-tertiary fw-semibold">Navigation</div>
+          <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+              <a class="list-group-item list-group-item-action {% if request.resolver_match and request.resolver_match.url_name == 'index' %}active{% endif %}"
+                 href="{% url 'backoffice:index' %}">
+                Home
+              </a>
+              {% for app_label, items in nav_tree.items %}
+                <div class="px-3 pt-3 pb-1 small text-uppercase text-muted">{{ app_label }}</div>
+                {% for it in items %}
+                  <a class="list-group-item list-group-item-action {% if item and item.app_label == it.app_label and item.model_name == it.model_name %}active{% endif %}"
+                     href="{% url 'backoffice:changelist' it.app_label it.model_name %}">
+                    {{ it.verbose_name_plural|capfirst }}
+                  </a>
+                {% endfor %}
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-9 col-xxl-10">
+        {% block backoffice_content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
