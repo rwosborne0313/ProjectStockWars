@@ -19,8 +19,12 @@
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-outline-secondary" href="{% url 'competitions:current_competitions' %}">Back to current competitions</a>
         {% if user.is_authenticated %}
-          {% if is_joined %}
+          {% if join_status == "ACTIVE" %}
             <a href="{% url 'simulator:dashboard_for_competition' competition.id %}" class="btn btn-primary">Go to your dashboard</a>
+          {% elif join_status == "QUEUED" %}
+            <a href="{% url 'competitions:withdraw_from_competition' competition.id %}" class="btn btn-outline-danger">
+              Withdraw from queue
+            </a>
           {% else %}
             <a href="{% url 'competitions:join_competition' competition.id %}" class="btn btn-primary">Join this competition</a>
           {% endif %}
@@ -184,8 +188,15 @@
         <div class="card-header">Geting Started is Easy!</div>
         <div class="card-body">
           {% if user.is_authenticated %}
-            {% if is_joined %}
+            {% if join_status == "ACTIVE" %}
               <a href="{% url 'simulator:dashboard_for_competition' competition.id %}" class="btn btn-primary w-100">Go to your dashboard</a>
+            {% elif join_status == "QUEUED" %}
+              <div class="alert alert-info mb-3" role="alert">
+                You’re queued and will be activated when the competition begins.
+              </div>
+              <a href="{% url 'competitions:withdraw_from_competition' competition.id %}" class="btn btn-outline-danger w-100">
+                Withdraw from queue
+              </a>
             {% else %}
               <a href="{% url 'competitions:join_competition' competition.id %}" class="btn btn-primary w-100">Join competition</a>
             {% endif %}

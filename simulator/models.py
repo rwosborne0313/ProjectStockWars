@@ -1,6 +1,8 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -146,3 +148,111 @@ class Position(models.Model):
 
     def __str__(self) -> str:
         return f"{self.participant_id}:{self.instrument_id}:{self.quantity}"
+
+
+class Basket(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="baskets"
+    )
+    name = models.CharField(max_length=120)
+    category = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "updated_at"]),
+            models.Index(fields=["user", "name"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id}:{self.name}"
+
+
+class BasketItem(models.Model):
+    basket = models.ForeignKey(Basket, on_delete=models.CASCADE, related_name="items")
+    instrument = models.ForeignKey(
+        "marketdata.Instrument", on_delete=models.PROTECT, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["basket", "instrument"], name="uniq_basketitem_basket_instrument"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["basket", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.basket_id}:{self.instrument_id}"
+
+
+class ScheduledBasketOrderStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    EXECUTED = "EXECUTED", "Executed"
+    FAILED = "FAILED", "Failed"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
+class ScheduledBasketOrder(models.Model):
+    participant = models.ForeignKey(
+        "competitions.CompetitionParticipant",
+        on_delete=models.CASCADE,
+        related_name="scheduled_basket_orders",
+    )
+    side = models.CharField(max_length=8, choices=OrderSide.choices)
+    total_amount = models.DecimalField(max_digits=20, decimal_places=2)
+    basket_name = models.CharField(max_length=120, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=ScheduledBasketOrderStatus.choices,
+        default=ScheduledBasketOrderStatus.PENDING,
+    )
+
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    executed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["participant", "status", "created_at"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.participant_id}:{self.side}:{self.total_amount}:{self.status}"
+
+
+class ScheduledBasketOrderLeg(models.Model):
+    order = models.ForeignKey(
+        ScheduledBasketOrder, on_delete=models.CASCADE, related_name="legs"
+    )
+    instrument = models.ForeignKey(
+        "marketdata.Instrument", on_delete=models.PROTECT, related_name="+"
+    )
+    pct = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        validators=[
+            MinValueValidator(Decimal("0.01")),
+            MaxValueValidator(Decimal("100.00")),
+        ],
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["order", "instrument"],
+                name="uniq_scheduled_basket_order_leg_order_instrument",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.order_id}:{self.instrument_id}:{self.pct}"

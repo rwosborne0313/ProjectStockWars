@@ -32,3 +32,9 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+from django.contrib import admin
+
+admin.site.site_header = "StockWars Admin"
+admin.site.site_title = "StockWars Admin"
+admin.site.index_title = "Administration"

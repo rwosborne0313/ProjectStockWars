@@ -15,6 +15,7 @@ class CompetitionStatus(models.TextChoices):
 
 class ParticipantStatus(models.TextChoices):
     ACTIVE = "ACTIVE", "Active"
+    QUEUED = "QUEUED", "Queued"
     DISQUALIFIED = "DISQUALIFIED", "Disqualified"
     LOCKED = "LOCKED", "Locked"
 
@@ -70,6 +71,10 @@ class Competition(models.Model):
     competition_type = models.CharField(
         max_length=16, choices=CompetitionType.choices, default=CompetitionType.STANDARD
     )
+
+    # Advanced join rule: optionally disallow joining once the competition has started.
+    # When enabled, users can join pre-start but are placed into a QUEUED status until activation at start time.
+    disallow_join_after_start = models.BooleanField(default=False)
 
     # Advanced rule configuration (nullable so STANDARD competitions are unaffected)
     max_single_symbol_pct = models.DecimalField(

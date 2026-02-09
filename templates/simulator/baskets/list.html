@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Baskets | StockWars{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+    <div>
+      <div class="text-muted small">Tools</div>
+      <div class="h4 mb-0">Your baskets</div>
+      <div class="text-muted small mt-1">
+        Create reusable groups of symbols for bulk buy/sell actions.
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-lg-5">
+      <div class="card">
+        <div class="card-header bg-body-tertiary fw-semibold">Create a new basket</div>
+        <div class="card-body">
+          <form method="post" action="{% url 'simulator:baskets' %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="basket_create">
+            <div class="mb-3">
+              <label class="form-label">Basket name</label>
+              {{ create_form.name }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Category</label>
+              {{ create_form.category }}
+              <div class="form-text">Optional: e.g. “Dividend”, “Tech”, “Value”, “Speculative”.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Notes</label>
+              {{ create_form.notes }}
+            </div>
+            <button class="btn btn-primary" type="submit">Create basket</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+      <div class="card">
+        <div class="card-header bg-body-tertiary fw-semibold">Existing baskets</div>
+        <div class="card-body">
+          {% if baskets %}
+            <div class="list-group">
+              {% for b in baskets %}
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                   href="{% url 'simulator:basket_detail' b.id %}">
+                  <div>
+                    <div class="fw-semibold">{{ b.name }}</div>
+                    {% if b.category %}
+                      <div class="small text-muted">{{ b.category|truncatechars:80 }}</div>
+                    {% endif %}
+                  </div>
+                  <div class="small text-muted">
+                    Updated {{ b.updated_at|naturaltime }}
+                  </div>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted">
+              You don’t have any baskets yet. Create one to get started.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

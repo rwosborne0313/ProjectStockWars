@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ basket.name }} | Baskets | StockWars{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+    <div>
+      <div class="text-muted small">Basket</div>
+      <div class="h4 mb-0">Delete: {{ basket.name }}</div>
+      <div class="text-muted small mt-1">This cannot be undone.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'simulator:basket_detail' basket.id %}">Back</a>
+    </div>
+  </div>
+
+  <div class="card border-danger">
+    <div class="card-header bg-danger-subtle fw-semibold">Confirm deletion</div>
+    <div class="card-body">
+      <div class="mb-3">
+        Are you sure you want to delete <span class="fw-semibold">“{{ basket.name }}”</span>?
+      </div>
+      <form method="post" action="{% url 'simulator:basket_delete' basket.id %}">
+        {% csrf_token %}
+        {{ form.basket_id }}
+        <button class="btn btn-danger" type="submit">Yes, delete basket</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+

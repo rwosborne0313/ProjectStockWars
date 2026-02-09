@@ -54,7 +54,6 @@ def current_competitions(request):
     competitions = (
         Competition.objects.filter(
             status=CompetitionStatus.PUBLISHED,
-            week_start_at__lte=now,
             week_end_at__gte=now,
         )
         .select_related("sponsor")
@@ -70,7 +69,7 @@ def current_competitions(request):
     return render(
         request,
         "competitions/current_list.html",
-        {"competitions": competitions, "joined_ids": joined_ids},
+        {"competitions": competitions, "joined_ids": joined_ids, "now": now},
     )
 
 
@@ -78,15 +77,17 @@ def competition_detail(request, competition_id: int):
     competition = get_object_or_404(
         Competition.objects.select_related("sponsor"), pk=competition_id
     )
-    is_joined = False
+    join_status = None
     if request.user.is_authenticated:
-        is_joined = CompetitionParticipant.objects.filter(
-            competition=competition, user=request.user
-        ).exists()
+        join_status = (
+            CompetitionParticipant.objects.filter(competition=competition, user=request.user)
+            .values_list("status", flat=True)
+            .first()
+        )
     return render(
         request,
         "competitions/detail.html",
-        {"competition": competition, "is_joined": is_joined},
+        {"competition": competition, "join_status": join_status},
     )
 
 
@@ -96,7 +97,8 @@ def active_competitions(request):
     competitions = (
         Competition.objects.filter(
             status=CompetitionStatus.PUBLISHED,
-            week_start_at__lte=now,
+            # "Active competitions" is used as the "open to join" list.
+            # Include competitions that haven't ended yet (including upcoming).
             week_end_at__gte=now,
         )
         .select_related("sponsor")
@@ -205,7 +207,32 @@ def join_competition(request, competition_id: int):
         messages.error(request, "Competition is not open for joining.")
         return redirect("competitions:competition_detail", competition_id=competition.id)
 
-    # Provision participant + starting cash atomically
+    now = timezone.now()
+
+    # Advanced rule: optionally disallow joining after start. Users can join before start but are queued.
+    if (
+        competition.competition_type == "ADVANCED"
+        and getattr(competition, "disallow_join_after_start", False)
+    ):
+        if now >= competition.week_start_at:
+            messages.error(request, "This competition is no longer open to join after it has started.")
+            return redirect("competitions:competition_detail", competition_id=competition.id)
+        try:
+            CompetitionParticipant.objects.create(
+                competition=competition,
+                user=request.user,
+                status=ParticipantStatus.QUEUED,
+                starting_cash=competition.starting_cash,
+                cash_balance=Decimal("0.00"),
+            )
+        except IntegrityError:
+            messages.info(request, "You are already in this competition.")
+            return redirect("competitions:competition_detail", competition_id=competition.id)
+
+        messages.success(request, "You’re queued for this competition. You’ll be activated at the start time.")
+        return redirect("competitions:competition_detail", competition_id=competition.id)
+
+    # Provision participant + starting cash atomically (default behavior)
     try:
         with transaction.atomic():
             participant = CompetitionParticipant.objects.create(
@@ -230,4 +257,31 @@ def join_competition(request, competition_id: int):
         f"Joined competition. Starting cash: ${Decimal(participant.starting_cash):,.2f}",
     )
     return redirect("simulator:dashboard_for_competition", competition_id=competition.id)
+
+
+@login_required
+def withdraw_from_competition(request, competition_id: int):
+    """
+    Withdraw from a competition queue prior to start time.
+    Only QUEUED participants can withdraw; ACTIVE participants are not withdrawn by this endpoint.
+    """
+    competition = get_object_or_404(Competition, pk=competition_id)
+    participant = CompetitionParticipant.objects.filter(
+        competition=competition, user=request.user
+    ).first()
+    if not participant:
+        messages.error(request, "You are not in this competition.")
+        return redirect("competitions:competition_detail", competition_id=competition.id)
+    if participant.status != ParticipantStatus.QUEUED:
+        messages.error(request, "Only queued participants can withdraw before the competition starts.")
+        return redirect("competitions:competition_detail", competition_id=competition.id)
+
+    now = timezone.now()
+    if now >= competition.week_start_at:
+        messages.error(request, "You can’t withdraw after the competition has started.")
+        return redirect("competitions:competition_detail", competition_id=competition.id)
+
+    participant.delete()
+    messages.success(request, "You have been removed from the competition queue.")
+    return redirect("competitions:competition_detail", competition_id=competition.id)
 

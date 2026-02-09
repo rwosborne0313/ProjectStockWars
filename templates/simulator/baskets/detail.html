@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}{{ basket.name }} | Baskets | StockWars{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+    <div>
+      <div class="text-muted small">Basket</div>
+      <div class="h4 mb-0">{{ basket.name }}</div>
+      {% if basket.category %}
+        <div class="text-muted small mt-1">{{ basket.category }}</div>
+      {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'simulator:baskets' %}">All baskets</a>
+      <a class="btn btn-outline-primary" href="{% url 'simulator:basket_edit' basket.id %}">Edit</a>
+      <a class="btn btn-outline-danger" href="{% url 'simulator:basket_delete' basket.id %}">Delete</a>
+    </div>
+  </div>
+
+  {% if basket.notes %}
+    <div class="card mb-4">
+      <div class="card-header bg-body-tertiary fw-semibold">Notes</div>
+      <div class="card-body">
+        <div class="text-muted">{{ basket.notes|linebreaksbr }}</div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="row g-4">
+    <div class="col-12 col-lg-5">
+      <div class="card">
+        <div class="card-header bg-body-tertiary fw-semibold">Add symbol</div>
+        <div class="card-body">
+          <form method="post" action="{% url 'simulator:basket_detail' basket.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="basket_add_symbol">
+            {{ add_form.basket_id }}
+            <div class="mb-2">
+              <label class="form-label">Symbol</label>
+              {{ add_form.symbol }}
+              <div class="form-text">Example: AAPL</div>
+            </div>
+            <button class="btn btn-primary" type="submit">Add to basket</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+      <div class="card">
+        <div class="card-header bg-body-tertiary fw-semibold">Symbols in this basket</div>
+        <div class="card-body">
+          {% if items %}
+            <div class="list-group">
+              {% for item in items %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <div class="fw-semibold">{{ item.instrument.symbol }}</div>
+                  <form method="post" action="{% url 'simulator:basket_detail' basket.id %}" class="m-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="basket_remove_symbol">
+                    <input type="hidden" name="basket_id" value="{{ basket.id }}">
+                    <input type="hidden" name="instrument_id" value="{{ item.instrument_id }}">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+                  </form>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted">No symbols yet. Add at least one symbol to use this basket for trading.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

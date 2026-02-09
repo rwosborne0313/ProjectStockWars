@@ -25,6 +25,63 @@ class WatchlistDeleteForm(forms.Form):
     watchlist_id = forms.IntegerField(min_value=1)
 
 
+class BasketCreateForm(forms.Form):
+    name = forms.CharField(max_length=120)
+    category = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update({"class": "form-control"})
+        self.fields["category"].widget.attrs.update({"class": "form-control"})
+        self.fields["notes"].widget.attrs.update({"class": "form-control"})
+
+
+class BasketEditForm(forms.Form):
+    basket_id = forms.IntegerField(min_value=1)
+    name = forms.CharField(max_length=120)
+    category = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 6}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["basket_id"].widget = forms.HiddenInput()
+        self.fields["name"].widget.attrs.update({"class": "form-control"})
+        self.fields["category"].widget.attrs.update({"class": "form-control"})
+        self.fields["notes"].widget.attrs.update({"class": "form-control"})
+
+
+class BasketDeleteForm(forms.Form):
+    basket_id = forms.IntegerField(min_value=1)
+
+
+class BasketAddSymbolForm(forms.Form):
+    basket_id = forms.IntegerField(min_value=1)
+    symbol = forms.CharField(max_length=16)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["basket_id"].widget = forms.HiddenInput()
+        self.fields["symbol"].widget.attrs.update(
+            {"class": "form-control", "autocapitalize": "characters", "autocomplete": "off"}
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        raw_symbol = cleaned.get("symbol")
+        if raw_symbol:
+            try:
+                cleaned["symbol"] = normalize_symbol(raw_symbol)
+            except ValueError as e:
+                self.add_error("symbol", str(e))
+        return cleaned
+
+
+class BasketRemoveSymbolForm(forms.Form):
+    basket_id = forms.IntegerField(min_value=1)
+    instrument_id = forms.IntegerField(min_value=1)
+
+
 class TradeTicketForm(forms.Form):
     side = forms.ChoiceField(choices=OrderSide.choices)
     order_type = forms.ChoiceField(choices=OrderType.choices)

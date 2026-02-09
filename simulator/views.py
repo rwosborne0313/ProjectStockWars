@@ -17,6 +17,11 @@ from marketdata.providers import TwelveDataProvider
 from marketdata.services import fetch_and_store_latest_quote, get_or_create_instrument_by_symbol, normalize_symbol
 
 from .forms import (
+    BasketAddSymbolForm,
+    BasketCreateForm,
+    BasketDeleteForm,
+    BasketEditForm,
+    BasketRemoveSymbolForm,
     OrderSearchForm,
     TradeTicketForm,
     WatchlistAddForm,
@@ -24,8 +29,17 @@ from .forms import (
     WatchlistDeleteForm,
     WatchlistRemoveForm,
 )
-from .models import Order, OrderSide, OrderType, TradeFill
-from .services import execute_order
+from .models import (
+    Basket,
+    BasketItem,
+    Order,
+    OrderSide,
+    OrderType,
+    ScheduledBasketOrder,
+    ScheduledBasketOrderLeg,
+    TradeFill,
+)
+from .services import execute_basket_order, execute_order
 
 
 def _rank_desc(values_by_id: dict[int, Decimal], subject_id: int) -> tuple[int | None, int]:
@@ -91,6 +105,121 @@ def dashboard_for_competition(request, competition_id: int):
             if wl:
                 return wl
             return Watchlist.objects.create(user=request.user, name="My Watchlist", industry_label="")
+
+        if request.POST.get("action") == "basket_trade":
+            try:
+                basket_id = int(request.POST.get("basket_id") or 0)
+            except (TypeError, ValueError):
+                basket_id = 0
+            basket = (
+                Basket.objects.filter(id=basket_id, user=request.user)
+                .prefetch_related("items__instrument")
+                .first()
+            )
+            if not basket:
+                messages.error(request, "Basket not found.")
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+
+            side = (request.POST.get("basket_side") or "").strip().upper()
+            raw_total = (request.POST.get("basket_total_amount") or "").strip()
+            try:
+                total_amount = Decimal(raw_total)
+            except Exception:
+                messages.error(request, "Total amount is invalid.")
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+
+            items = sorted(list(basket.items.all()), key=lambda x: (x.instrument.symbol, x.id))
+            if not items:
+                messages.error(request, "This basket has no symbols.")
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+
+            pct_by_instrument_id: dict[int, Decimal] = {}
+            for it in items:
+                key = f"pct_{it.instrument_id}"
+                raw = (request.POST.get(key) or "").strip()
+                try:
+                    pct_by_instrument_id[it.instrument_id] = Decimal(raw)
+                except Exception:
+                    pct_by_instrument_id[it.instrument_id] = Decimal("0")
+
+            # If the competition hasn't started yet, save the basket order for execution at start.
+            if now < participant.competition.week_start_at:
+                competition = participant.competition
+                max_pct = (
+                    Decimal(competition.max_single_symbol_pct)
+                    if competition.competition_type == "ADVANCED"
+                    and competition.max_single_symbol_pct is not None
+                    else Decimal("0.33")
+                )
+
+                # Validate allocations: each > 0, sum=100, and each <= max per symbol %.
+                total_pct = Decimal("0.00")
+                for it in items:
+                    pct = pct_by_instrument_id.get(it.instrument_id) or Decimal("0")
+                    if pct <= 0:
+                        messages.error(request, f"Allocation for {it.instrument.symbol} must be > 0%.")
+                        return redirect(
+                            "simulator:dashboard_for_competition", competition_id=competition_id
+                        )
+                    if pct > (max_pct * Decimal("100")):
+                        messages.error(
+                            request,
+                            f"{it.instrument.symbol} allocation exceeds the max per-symbol percent for this competition.",
+                        )
+                        return redirect(
+                            "simulator:dashboard_for_competition", competition_id=competition_id
+                        )
+                    total_pct += pct
+
+                if abs(total_pct - Decimal("100.00")) > Decimal("0.01"):
+                    messages.error(request, "Allocations must total 100%.")
+                    return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+
+                # Buying power validation for pre-start scheduling (validate vs starting_cash).
+                if side == OrderSide.BUY and total_amount > Decimal(participant.starting_cash):
+                    over = total_amount - Decimal(participant.starting_cash)
+                    messages.error(
+                        request,
+                        f"Total basket amount exceeds your starting cash by ${over:,.2f}. Reduce the total and try again.",
+                    )
+                    return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+
+                scheduled = ScheduledBasketOrder.objects.create(
+                    participant=participant,
+                    side=side,
+                    total_amount=total_amount,
+                    basket_name=basket.name,
+                )
+                ScheduledBasketOrderLeg.objects.bulk_create(
+                    [
+                        ScheduledBasketOrderLeg(
+                            order=scheduled, instrument_id=it.instrument_id, pct=pct_by_instrument_id[it.instrument_id]
+                        )
+                        for it in items
+                    ]
+                )
+                messages.success(
+                    request,
+                    "Basket order scheduled for execution at competition start.",
+                )
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+
+            result = execute_basket_order(
+                participant_id=participant.id,
+                basket_name=basket.name,
+                side=side,
+                total_amount=total_amount,
+                pct_by_instrument_id=pct_by_instrument_id,
+            )
+            if result.ok:
+                messages.success(request, result.message)
+            else:
+                if (result.meta or {}).get("reason") == "INSUFFICIENT_CASH":
+                    request.session["basket_cash_modal"] = result.meta
+                    messages.error(request, result.message, extra_tags="basket-cash-modal")
+                else:
+                    messages.error(request, result.message)
+            return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
 
         if request.POST.get("action") == "positions_refresh":
             positions = list(
@@ -451,9 +580,33 @@ def dashboard_for_competition(request, competition_id: int):
     }
 
     trade_limit_modal = request.session.pop("trade_limit_modal", None)
+    basket_cash_modal = request.session.pop("basket_cash_modal", None)
     competition_end_at = participant.competition.week_end_at
     competition_is_over = now >= competition_end_at
     competition_end_iso = timezone.localtime(competition_end_at).isoformat()
+
+    # Baskets (user-owned symbol groups used by the basket-trade modal)
+    user_baskets = list(
+        Basket.objects.filter(user=request.user)
+        .prefetch_related("items__instrument")
+        .order_by("-updated_at", "name", "id")
+    )
+    basket_map = {
+        b.id: {
+            "id": b.id,
+            "name": b.name,
+            "symbols": [
+                {"instrument_id": bi.instrument_id, "symbol": bi.instrument.symbol}
+                for bi in sorted(b.items.all(), key=lambda x: (x.instrument.symbol, x.id))
+            ],
+        }
+        for b in user_baskets
+    }
+    max_pct = (
+        participant.competition.max_single_symbol_pct
+        if participant.competition.max_single_symbol_pct is not None
+        else Decimal("0.33")
+    )
 
     return render(
         request,
@@ -476,8 +629,12 @@ def dashboard_for_competition(request, competition_id: int):
             "watchlist_add_form": watchlist_add_form,
             "ranking_card": ranking_card,
             "trade_limit_modal": trade_limit_modal,
+            "basket_cash_modal": basket_cash_modal,
             "competition_end_iso": competition_end_iso,
             "competition_is_over": competition_is_over,
+            "user_baskets": user_baskets,
+            "basket_map": basket_map,
+            "basket_max_pct": max_pct,
         },
     )
 
@@ -648,6 +805,149 @@ def watchlist(request):
             "watchlist_symbols": [r["symbol"] for r in rows],
         },
     )
+
+
+@login_required
+def baskets(request):
+    """
+    Basket list + create.
+    A Basket is a user-owned named group of symbols for future bulk trading.
+    """
+    if request.method == "POST":
+        if request.POST.get("action") == "basket_create":
+            form = BasketCreateForm(request.POST)
+            if form.is_valid():
+                name = (form.cleaned_data.get("name") or "").strip()
+                category = (form.cleaned_data.get("category") or "").strip()
+                notes = (form.cleaned_data.get("notes") or "").strip()
+                if not name:
+                    messages.error(request, "Basket name is required.")
+                else:
+                    b = Basket.objects.create(
+                        user=request.user, name=name, category=category, notes=notes
+                    )
+                    messages.success(request, f"Created basket “{b.name}”.")
+                    return redirect("simulator:basket_detail", basket_id=b.id)
+            else:
+                messages.error(request, "Could not create basket.")
+            return redirect("simulator:baskets")
+
+    baskets_list = list(Basket.objects.filter(user=request.user).order_by("-updated_at", "name", "id"))
+    create_form = BasketCreateForm()
+    return render(
+        request,
+        "simulator/baskets/list.html",
+        {"baskets": baskets_list, "create_form": create_form},
+    )
+
+
+@login_required
+def basket_detail(request, basket_id: int):
+    basket = Basket.objects.filter(id=basket_id, user=request.user).first()
+    if not basket:
+        messages.error(request, "Basket not found.")
+        return redirect("simulator:baskets")
+
+    if request.method == "POST":
+        if request.POST.get("action") == "basket_add_symbol":
+            add_form = BasketAddSymbolForm(request.POST)
+            if add_form.is_valid():
+                if int(add_form.cleaned_data["basket_id"]) != int(basket.id):
+                    messages.error(request, "Basket mismatch.")
+                    return redirect("simulator:basket_detail", basket_id=basket.id)
+                instrument = get_or_create_instrument_by_symbol(add_form.cleaned_data["symbol"])
+                BasketItem.objects.get_or_create(basket=basket, instrument=instrument)
+                fetch_and_store_latest_quote(instrument=instrument)
+                messages.success(request, f"Added {instrument.symbol} to basket “{basket.name}”.")
+            else:
+                messages.error(request, "Could not add symbol to basket.")
+            return redirect("simulator:basket_detail", basket_id=basket.id)
+
+        if request.POST.get("action") == "basket_remove_symbol":
+            rm_form = BasketRemoveSymbolForm(request.POST)
+            if rm_form.is_valid():
+                if int(rm_form.cleaned_data["basket_id"]) != int(basket.id):
+                    messages.error(request, "Basket mismatch.")
+                    return redirect("simulator:basket_detail", basket_id=basket.id)
+                BasketItem.objects.filter(
+                    basket=basket, instrument_id=rm_form.cleaned_data["instrument_id"]
+                ).delete()
+                messages.success(request, "Removed symbol from basket.")
+            else:
+                messages.error(request, "Could not remove symbol from basket.")
+            return redirect("simulator:basket_detail", basket_id=basket.id)
+
+    items = list(
+        BasketItem.objects.filter(basket=basket)
+        .select_related("instrument")
+        .order_by("instrument__symbol", "id")
+    )
+
+    add_form = BasketAddSymbolForm(initial={"basket_id": basket.id})
+    delete_form = BasketDeleteForm(initial={"basket_id": basket.id})
+    return render(
+        request,
+        "simulator/baskets/detail.html",
+        {"basket": basket, "items": items, "add_form": add_form, "delete_form": delete_form},
+    )
+
+
+@login_required
+def basket_edit(request, basket_id: int):
+    basket = Basket.objects.filter(id=basket_id, user=request.user).first()
+    if not basket:
+        messages.error(request, "Basket not found.")
+        return redirect("simulator:baskets")
+
+    if request.method == "POST":
+        form = BasketEditForm(request.POST)
+        if form.is_valid() and int(form.cleaned_data["basket_id"]) == int(basket.id):
+            name = (form.cleaned_data.get("name") or "").strip()
+            category = (form.cleaned_data.get("category") or "").strip()
+            notes = (form.cleaned_data.get("notes") or "").strip()
+            if not name:
+                messages.error(request, "Basket name is required.")
+            else:
+                basket.name = name
+                basket.category = category
+                basket.notes = notes
+                basket.save(update_fields=["name", "category", "notes", "updated_at"])
+                messages.success(request, "Basket updated.")
+                return redirect("simulator:basket_detail", basket_id=basket.id)
+        else:
+            messages.error(request, "Could not update basket.")
+        return redirect("simulator:basket_edit", basket_id=basket.id)
+
+    form = BasketEditForm(
+        initial={
+            "basket_id": basket.id,
+            "name": basket.name,
+            "category": basket.category,
+            "notes": basket.notes,
+        }
+    )
+    return render(request, "simulator/baskets/edit.html", {"basket": basket, "form": form})
+
+
+@login_required
+def basket_delete(request, basket_id: int):
+    basket = Basket.objects.filter(id=basket_id, user=request.user).first()
+    if not basket:
+        messages.error(request, "Basket not found.")
+        return redirect("simulator:baskets")
+
+    if request.method == "POST":
+        form = BasketDeleteForm(request.POST)
+        if form.is_valid() and int(form.cleaned_data["basket_id"]) == int(basket.id):
+            name = basket.name
+            basket.delete()
+            messages.success(request, f"Deleted basket “{name}”.")
+            return redirect("simulator:baskets")
+        messages.error(request, "Could not delete basket.")
+        return redirect("simulator:basket_detail", basket_id=basket.id)
+
+    form = BasketDeleteForm(initial={"basket_id": basket.id})
+    return render(request, "simulator/baskets/delete.html", {"basket": basket, "form": form})
 
 
 @login_required
