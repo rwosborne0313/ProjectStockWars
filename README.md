@@ -53,3 +53,38 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+## EC2 (git-based) deployment checklist
+
+### One-time provisioning (run on EC2 as `ubuntu`)
+
+```bash
+cd /path/to/ProjectStockWars
+bash scripts/ec2_provision_server.sh
+```
+
+Create `/opt/stockwars/.env` (see `scripts/ec2_env_example.sh`). For local Postgres on the instance, use:
+
+- `POSTGRES_HOST=127.0.0.1`
+
+Then (recommended) clone your repo into `/opt/stockwars/app` as the `stockwars` user:
+
+```bash
+sudo -u stockwars bash -lc 'cd /opt/stockwars && git clone <your-repo-url> app'
+```
+
+### Repeatable deploy (run on EC2 after `git pull`)
+
+```bash
+cd /opt/stockwars/app
+sudo bash scripts/deploy_on_server.sh
+```
+
+### Verify (quick)
+
+```bash
+sudo systemctl status daphne-stockwars --no-pager
+sudo nginx -t
+curl -I http://127.0.0.1/
+sudo ss -lntp | rg ':443|:80'
+```
+

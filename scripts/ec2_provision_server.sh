@@ -6,14 +6,16 @@ set -euo pipefail
 #   bash scripts/ec2_provision_server.sh
 #
 # What it does:
-# - installs OS deps (nginx, python build deps)
+# - installs OS deps (nginx, python build deps, local postgres)
 # - creates a dedicated system user (stockwars) and directories under /opt/stockwars
 # - creates a self-signed TLS cert valid for 180 days (~6 months)
 # - configures nginx (HTTPS + WebSockets) proxying to Daphne via unix socket
 # - creates a systemd service for Daphne (ASGI)
 #
 # IMPORTANT:
-# - You must create /opt/stockwars/.env separately (DB creds, secret key, etc).
+# - You must create /opt/stockwars/.env (DB creds, secret key, etc).
+# - If /opt/stockwars/.env exists at provision time, this script will also create
+#   the Postgres role/database defined there (idempotent).
 
 APP_USER="stockwars"
 BASE_DIR="/opt/stockwars"
@@ -21,10 +23,33 @@ APP_DIR="/opt/stockwars/app"
 SOCK_DIR="/run/daphne"
 SOCK_PATH="${SOCK_DIR}/stockwars.sock"
 
-# Cert CN: set STOCKWARS_CERT_CN or we default to instance public hostname.
-CERT_CN="${STOCKWARS_CERT_CN:-}"
+_imds_get() {
+  # Query IMDSv2 (falls back cleanly if unavailable).
+  local path="$1"
+  local token
+  token="$(curl -sS -m 2 -X PUT "http://169.254.169.254/latest/api/token" \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" || true)"
+  if [[ -n "${token}" ]]; then
+    curl -sS -m 2 -H "X-aws-ec2-metadata-token: ${token}" "http://169.254.169.254/latest/meta-data/${path}" || true
+  else
+    curl -sS -m 2 "http://169.254.169.254/latest/meta-data/${path}" || true
+  fi
+}
+
+_sanitize_cn() {
+  # Keep CN within 64 chars and remove problematic characters.
+  # Allows letters, digits, dots, dashes, underscores (covers hostnames + IPv4).
+  local raw="$1"
+  raw="${raw//$'\n'/}"
+  raw="${raw//$'\r'/}"
+  raw="$(echo -n "${raw}" | tr -cd 'A-Za-z0-9._-')"
+  echo -n "${raw:0:64}"
+}
+
+# Cert CN: prefer STOCKWARS_CERT_CN, else EC2 public-hostname, else localhost.
+CERT_CN="$(_sanitize_cn "${STOCKWARS_CERT_CN:-}")"
 if [[ -z "${CERT_CN}" ]]; then
-  CERT_CN="$(curl -s http://169.254.169.254/latest/meta-data/public-hostname || true)"
+  CERT_CN="$(_sanitize_cn "$(_imds_get "public-hostname")")"
 fi
 CERT_CN="${CERT_CN:-localhost}"
 
@@ -32,8 +57,36 @@ echo "Provisioning packages..."
 sudo apt-get update
 sudo apt-get install -y \
   python3-venv python3-dev build-essential pkg-config \
-  nginx postgresql-client libpq-dev \
+  nginx postgresql postgresql-client libpq-dev \
   openssl curl
+
+echo "Ensuring Postgres is running..."
+sudo systemctl enable --now postgresql >/dev/null 2>&1 || true
+
+echo "Creating local Postgres role/db (if env present)..."
+if [[ -f "${BASE_DIR}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${BASE_DIR}/.env"
+  set +a
+
+  POSTGRES_DB="${POSTGRES_DB:-stockwars}"
+  POSTGRES_USER="${POSTGRES_USER:-stockwars}"
+  POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
+
+  if [[ -z "${POSTGRES_PASSWORD}" ]]; then
+    echo "WARN: ${BASE_DIR}/.env is missing POSTGRES_PASSWORD; skipping DB/user creation."
+  else
+    sudo -u postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER}'" | grep -q 1 \
+      || sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE ROLE ${POSTGRES_USER} LOGIN PASSWORD '${POSTGRES_PASSWORD}';"
+
+    sudo -u postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'" | grep -q 1 \
+      || sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${POSTGRES_DB} OWNER ${POSTGRES_USER};"
+  fi
+else
+  echo "INFO: ${BASE_DIR}/.env not found yet; skipping DB/user creation for now."
+  echo "      After you create it, you can rerun this script or create the DB manually."
+fi
 
 echo "Creating app user + directories..."
 if ! id -u "${APP_USER}" >/dev/null 2>&1; then
@@ -125,5 +178,6 @@ sudo systemctl enable daphne-stockwars
 echo "Provisioning complete."
 echo "Next:"
 echo "1) Create ${BASE_DIR}/.env"
-echo "2) Deploy code from your laptop (scripts/deploy_ec2.sh)"
+echo "2) Deploy code to ${APP_DIR} (git clone / git pull)"
+echo "3) Create venv + migrate + collectstatic + restart services (see scripts/deploy_on_server.sh)"
 

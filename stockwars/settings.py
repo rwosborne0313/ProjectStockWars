@@ -195,8 +195,17 @@ USE_TZ = True
 STATIC_URL = "/static/"
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
+
+# Where collectstatic writes files (required for production).
+# On EC2 we serve /static/ from /opt/stockwars/static via nginx.
+if DEBUG:
+    STATIC_ROOT = BASE_DIR / "staticfiles"
+    MEDIA_ROOT = BASE_DIR / "media"
+else:
+    STATIC_ROOT = Path(os.environ.get("DJANGO_STATIC_ROOT", "/opt/stockwars/static"))
+    MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", "/opt/stockwars/media"))
+
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
 
 # Quote staleness policy (seconds)
 MAX_QUOTE_AGE_SECONDS = _get_env_int("MAX_QUOTE_AGE_SECONDS", 300)
