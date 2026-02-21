@@ -1,5 +1,7 @@
 from decimal import Decimal
 from datetime import datetime, time, timezone as py_timezone, timedelta
+from math import ceil
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -579,6 +581,77 @@ def dashboard_for_competition(request, competition_id: int):
         "realized_total": rank_realized_total,
     }
 
+    # Competition-wide rankings table (anonymous, paginated)
+    ranked_participant_ids = sorted(
+        participant_ids,
+        key=lambda pid: (values_equity.get(pid, Decimal("0.00")), pid),
+        reverse=True,
+    )
+    competition_rows = []
+    for idx, pid in enumerate(ranked_participant_ids, start=1):
+        competition_rows.append(
+            {
+                "rank": idx,
+                "label": "You" if pid == participant.id else f"Trader #{idx}",
+                "is_me": pid == participant.id,
+                "equity": values_equity.get(pid, Decimal("0.00")),
+                "cash": values_cash.get(pid, Decimal("0.00")),
+                "holdings": values_holdings.get(pid, Decimal("0.00")),
+                "unrealized": values_unrealized.get(pid, Decimal("0.00")),
+                "realized_today": values_realized_today.get(pid, Decimal("0.00")),
+                "realized_total": values_realized_total.get(pid, Decimal("0.00")),
+            }
+        )
+
+    try:
+        rank_page = int(request.GET.get("rank_page") or 1)
+    except (TypeError, ValueError):
+        rank_page = 1
+    rank_page_size = 50
+    competition_table_total = len(competition_rows)
+    competition_table_pages = max(1, int(ceil(competition_table_total / rank_page_size))) if competition_table_total else 1
+    rank_page = max(1, min(rank_page, competition_table_pages))
+    start_idx = (rank_page - 1) * rank_page_size
+    end_idx = min(start_idx + rank_page_size, competition_table_total)
+    competition_table_rows = competition_rows[start_idx:end_idx]
+
+    def _page_url(page_num: int) -> str:
+        q = request.GET.copy()
+        q["rank_page"] = str(page_num)
+        return f"{request.path}?{urlencode(q, doseq=True)}"
+
+    competition_table_prev_url = _page_url(rank_page - 1) if rank_page > 1 else None
+    competition_table_next_url = _page_url(rank_page + 1) if rank_page < competition_table_pages else None
+
+    # Compact page number list (max 7 links)
+    page_links = []
+    if competition_table_pages <= 7:
+        page_links = list(range(1, competition_table_pages + 1))
+    else:
+        # Center around current page
+        left = max(1, rank_page - 2)
+        right = min(competition_table_pages, rank_page + 2)
+        if left <= 2:
+            left, right = 1, 5
+        elif right >= competition_table_pages - 1:
+            left, right = competition_table_pages - 4, competition_table_pages
+        page_links = [1]
+        if left > 2:
+            page_links.append(None)
+        page_links.extend(list(range(left, right + 1)))
+        if right < competition_table_pages - 1:
+            page_links.append(None)
+        page_links.append(competition_table_pages)
+
+    competition_table_page_link_objs = []
+    for p in page_links:
+        if p is None:
+            competition_table_page_link_objs.append({"gap": True})
+        else:
+            competition_table_page_link_objs.append(
+                {"gap": False, "page": p, "url": _page_url(p), "is_current": p == rank_page}
+            )
+
     trade_limit_modal = request.session.pop("trade_limit_modal", None)
     basket_cash_modal = request.session.pop("basket_cash_modal", None)
     competition_end_at = participant.competition.week_end_at
@@ -628,6 +701,15 @@ def dashboard_for_competition(request, competition_id: int):
             "watchlist_rows": watchlist_rows,
             "watchlist_add_form": watchlist_add_form,
             "ranking_card": ranking_card,
+            "competition_table_rows": competition_table_rows,
+            "competition_table_page": rank_page,
+            "competition_table_pages": competition_table_pages,
+            "competition_table_total": competition_table_total,
+            "competition_table_start": start_idx + 1 if competition_table_total else 0,
+            "competition_table_end": end_idx if competition_table_total else 0,
+            "competition_table_prev_url": competition_table_prev_url,
+            "competition_table_next_url": competition_table_next_url,
+            "competition_table_page_links": competition_table_page_link_objs,
             "trade_limit_modal": trade_limit_modal,
             "basket_cash_modal": basket_cash_modal,
             "competition_end_iso": competition_end_iso,

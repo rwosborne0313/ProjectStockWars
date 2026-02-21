@@ -423,6 +423,95 @@
 
     <div class="col-lg-10">
       <div class="card mb-4">
+        <div class="card-header bg-body-tertiary fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <span>Competition rankings</span>
+          <div class="small text-muted">
+            Showing {{ competition_table_start }}–{{ competition_table_end }} of {{ competition_table_total }}
+          </div>
+        </div>
+        <div class="card-body p-0">
+          {% if competition_table_rows %}
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0" id="competitionRankingTable">
+                <thead>
+                  <tr>
+                    <th class="ps-3 js-rank-sort" role="button" tabindex="0" data-sort-key="rank" data-sort-type="number">Rank</th>
+                    <th role="button" tabindex="0" data-sort-key="label" data-sort-type="text">Trader</th>
+                    <th class="text-end" role="button" tabindex="0" data-sort-key="equity" data-sort-type="number">Total equity</th>
+                    <th class="text-end" role="button" tabindex="0" data-sort-key="cash" data-sort-type="number">Cash / buying power</th>
+                    <th class="text-end" role="button" tabindex="0" data-sort-key="holdings" data-sort-type="number">Market value</th>
+                    <th class="text-end" role="button" tabindex="0" data-sort-key="unrealized" data-sort-type="number">Unrealized P&amp;L</th>
+                    <th class="text-end" role="button" tabindex="0" data-sort-key="realized_today" data-sort-type="number">Realized (today)</th>
+                    <th class="text-end pe-3" role="button" tabindex="0" data-sort-key="realized_total" data-sort-type="number">Realized (total)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in competition_table_rows %}
+                    <tr class="{% if r.is_me %}table-primary{% endif %}">
+                      <td class="ps-3" data-col="rank" data-value="{{ r.rank }}">{{ r.rank }}</td>
+                      <td data-col="label" data-value="{{ r.label }}">
+                        <span class="fw-semibold">{{ r.label }}</span>
+                      </td>
+                      <td class="text-end" data-col="equity" data-value="{{ r.equity }}">
+                        ${{ r.equity|floatformat:2|intcomma }}
+                      </td>
+                      <td class="text-end" data-col="cash" data-value="{{ r.cash }}">
+                        ${{ r.cash|floatformat:2|intcomma }}
+                      </td>
+                      <td class="text-end" data-col="holdings" data-value="{{ r.holdings }}">
+                        ${{ r.holdings|floatformat:2|intcomma }}
+                      </td>
+                      <td class="text-end" data-col="unrealized" data-value="{{ r.unrealized }}">
+                        <span class="{% if r.unrealized >= 0 %}text-success{% else %}text-danger{% endif %}">
+                          ${{ r.unrealized|floatformat:2|intcomma }}
+                        </span>
+                      </td>
+                      <td class="text-end" data-col="realized_today" data-value="{{ r.realized_today }}">
+                        <span class="{% if r.realized_today >= 0 %}text-success{% else %}text-danger{% endif %}">
+                          ${{ r.realized_today|floatformat:2|intcomma }}
+                        </span>
+                      </td>
+                      <td class="text-end pe-3" data-col="realized_total" data-value="{{ r.realized_total }}">
+                        <span class="{% if r.realized_total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                          ${{ r.realized_total|floatformat:2|intcomma }}
+                        </span>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="p-3 text-muted">No participants found for this competition.</div>
+          {% endif %}
+        </div>
+        <div class="card-footer bg-body d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <nav aria-label="Competition rankings pagination">
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item {% if not competition_table_prev_url %}disabled{% endif %}">
+                <a class="page-link" href="{% if competition_table_prev_url %}{{ competition_table_prev_url }}{% else %}#{% endif %}">Prev</a>
+              </li>
+              {% for it in competition_table_page_links %}
+                {% if it.gap %}
+                  <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% else %}
+                  <li class="page-item {% if it.is_current %}active{% endif %}">
+                    <a class="page-link" href="{{ it.url }}">{{ it.page }}</a>
+                  </li>
+                {% endif %}
+              {% endfor %}
+              <li class="page-item {% if not competition_table_next_url %}disabled{% endif %}">
+                <a class="page-link" href="{% if competition_table_next_url %}{{ competition_table_next_url }}{% else %}#{% endif %}">Next</a>
+              </li>
+            </ul>
+          </nav>
+          <div class="small text-muted">
+            Tip: click a column header to sort this page.
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
         <div class="card-header bg-body-tertiary fw-semibold d-flex justify-content-between align-items-center">
           <span>Positions</span>
           <form method="post" class="m-0">
@@ -1285,6 +1374,99 @@
             return;
           }
         });
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function parseNum(v) {
+        var n = Number(String(v || "").replace(/[^0-9.\-]/g, ""));
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function cmp(a, b) {
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var table = document.getElementById("competitionRankingTable");
+        if (!table) return;
+        var tbody = table.querySelector("tbody");
+        if (!tbody) return;
+
+        var headers = Array.prototype.slice.call(table.querySelectorAll("thead th[data-sort-key]"));
+        var sortState = { key: "rank", dir: "asc", type: "number" };
+
+        function getCellValue(tr, key, type) {
+          var td = tr.querySelector("td[data-col='" + key + "']");
+          if (!td) return type === "number" ? 0 : "";
+          var raw = td.getAttribute("data-value") || td.textContent || "";
+          return type === "number" ? parseNum(raw) : String(raw).toLowerCase();
+        }
+
+        function applySort() {
+          var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
+          var key = sortState.key;
+          var dir = sortState.dir;
+          var type = sortState.type;
+          rows.sort(function (ra, rb) {
+            var va = getCellValue(ra, key, type);
+            var vb = getCellValue(rb, key, type);
+            var primary = cmp(va, vb);
+            if (primary === 0) {
+              // stable-ish tiebreaker: equity-rank column
+              var rka = getCellValue(ra, "rank", "number");
+              var rkb = getCellValue(rb, "rank", "number");
+              primary = cmp(rka, rkb);
+            }
+            return dir === "asc" ? primary : -primary;
+          });
+          rows.forEach(function (tr) { tbody.appendChild(tr); });
+
+          headers.forEach(function (th) {
+            th.classList.remove("text-decoration-underline");
+            th.removeAttribute("aria-sort");
+          });
+          var active = table.querySelector("thead th[data-sort-key='" + key + "']");
+          if (active) {
+            active.classList.add("text-decoration-underline");
+            active.setAttribute("aria-sort", dir === "asc" ? "ascending" : "descending");
+          }
+        }
+
+        function onHeaderActivate(th) {
+          var key = th.getAttribute("data-sort-key") || "";
+          var type = th.getAttribute("data-sort-type") || "text";
+          if (!key) return;
+
+          var defaultDir = "asc";
+          if (type === "number" && key !== "rank") defaultDir = "desc";
+
+          if (sortState.key === key) {
+            sortState.dir = (sortState.dir === "asc") ? "desc" : "asc";
+          } else {
+            sortState.key = key;
+            sortState.type = type;
+            sortState.dir = defaultDir;
+          }
+          applySort();
+        }
+
+        headers.forEach(function (th) {
+          th.addEventListener("click", function () { onHeaderActivate(th); });
+          th.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onHeaderActivate(th);
+            }
+          });
+        });
+
+        // initial styling for default sort (rank asc)
+        applySort();
       });
     })();
   </script>

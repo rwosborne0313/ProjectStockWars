@@ -26,6 +26,7 @@ urlpatterns = [
     path("", include("marketdata.urls")),
     path("", include("simulator.urls")),
     path("", include("leaderboards.urls")),
+    path("", include("messaging.urls")),
     path("accounts/", include("accounts.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
 ]

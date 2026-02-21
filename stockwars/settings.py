@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     'marketdata',
     'simulator',
     'leaderboards',
+    'messaging',
 ]
 
 MIDDLEWARE = [

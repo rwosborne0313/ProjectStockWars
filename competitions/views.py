@@ -3,11 +3,12 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from marketdata.models import Quote
-from simulator.models import Position
+from simulator.models import OrderSide, Position, TradeFill
 from simulator.models import CashLedgerEntry, CashLedgerReason
 
 from .models import Competition, CompetitionParticipant, CompetitionStatus, ParticipantStatus
@@ -117,6 +118,7 @@ def active_competitions(request):
 
 @login_required
 def my_competitions(request):
+    now = timezone.now()
     participations = list(
         CompetitionParticipant.objects.filter(user=request.user)
         .select_related("competition", "competition__sponsor")
@@ -173,6 +175,35 @@ def my_competitions(request):
             else:
                 return_by_participant[p.id] = Decimal("0.00")
 
+        # Realized P&L totals across participants (SELL fills)
+        now_local = timezone.localtime(now)
+        start_of_day = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        realized_totals = {
+            row["order__participant_id"]: row["total"] or Decimal("0.00")
+            for row in TradeFill.objects.filter(
+                order__participant_id__in=participant_ids,
+                order__side=OrderSide.SELL,
+            )
+            .values("order__participant_id")
+            .annotate(total=Sum("realized_pnl"))
+        }
+        realized_todays = {
+            row["order__participant_id"]: row["total"] or Decimal("0.00")
+            for row in TradeFill.objects.filter(
+                order__participant_id__in=participant_ids,
+                order__side=OrderSide.SELL,
+                filled_at__gte=start_of_day,
+            )
+            .values("order__participant_id")
+            .annotate(total=Sum("realized_pnl"))
+        }
+        realized_total_by_participant: dict[int, Decimal] = {
+            pid: realized_totals.get(pid, Decimal("0.00")) for pid in participant_ids
+        }
+        realized_today_by_participant: dict[int, Decimal] = {
+            pid: realized_todays.get(pid, Decimal("0.00")) for pid in participant_ids
+        }
+
         # Group participants by competition_id for per-competition ranks.
         participants_by_comp: dict[int, list[int]] = {}
         for p in all_participants:
@@ -180,23 +211,64 @@ def my_competitions(request):
 
         for p in participations:
             comp_pids = participants_by_comp.get(p.competition_id, [])
+            p.rank_total = len(comp_pids)
+
+            # Attach metric values for this participant (always show)
+            p.stat_equity = equity_by_participant.get(p.id, Decimal("0.00"))
+            p.stat_return = return_by_participant.get(p.id, Decimal("0.00"))
+            p.stat_return_pct = p.stat_return * Decimal("100")
+            p.stat_cash = cash_by_participant.get(p.id, getattr(p, "cash_balance", Decimal("0.00")))
+            p.stat_holdings = holdings_by_participant.get(p.id, Decimal("0.00"))
+            p.stat_realized_today = realized_today_by_participant.get(p.id, Decimal("0.00"))
+            p.stat_realized_total = realized_total_by_participant.get(p.id, Decimal("0.00"))
+
+            if p.status != ParticipantStatus.ACTIVE:
+                p.rank_equity = None
+                p.rank_return = None
+                p.rank_cash = None
+                p.rank_holdings = None
+                p.rank_realized_today = None
+                p.rank_realized_total = None
+                continue
+
             equity_vals = {pid: equity_by_participant.get(pid, Decimal("0.00")) for pid in comp_pids}
             return_vals = {pid: return_by_participant.get(pid, Decimal("0.00")) for pid in comp_pids}
-            rank_equity, total = _rank_desc(equity_vals, p.id)
-            rank_return, _ = _rank_desc(return_vals, p.id)
-            p.rank_total = total
-            p.rank_equity = rank_equity
-            p.rank_return = rank_return
+            cash_vals = {pid: cash_by_participant.get(pid, Decimal("0.00")) for pid in comp_pids}
+            holdings_vals = {pid: holdings_by_participant.get(pid, Decimal("0.00")) for pid in comp_pids}
+            realized_today_vals = {
+                pid: realized_today_by_participant.get(pid, Decimal("0.00")) for pid in comp_pids
+            }
+            realized_total_vals = {
+                pid: realized_total_by_participant.get(pid, Decimal("0.00")) for pid in comp_pids
+            }
+
+            p.rank_equity, _ = _rank_desc(equity_vals, p.id)
+            p.rank_return, _ = _rank_desc(return_vals, p.id)
+            p.rank_cash, _ = _rank_desc(cash_vals, p.id)
+            p.rank_holdings, _ = _rank_desc(holdings_vals, p.id)
+            p.rank_realized_today, _ = _rank_desc(realized_today_vals, p.id)
+            p.rank_realized_total, _ = _rank_desc(realized_total_vals, p.id)
     else:
         for p in participations:
             p.rank_total = 0
             p.rank_equity = None
             p.rank_return = None
+            p.rank_cash = None
+            p.rank_holdings = None
+            p.rank_realized_today = None
+            p.rank_realized_total = None
+            p.stat_equity = Decimal("0.00")
+            p.stat_return = Decimal("0.00")
+            p.stat_return_pct = Decimal("0.00")
+            p.stat_cash = getattr(p, "cash_balance", Decimal("0.00"))
+            p.stat_holdings = Decimal("0.00")
+            p.stat_realized_today = Decimal("0.00")
+            p.stat_realized_total = Decimal("0.00")
 
     return render(
         request,
         "competitions/my_competitions.html",
-        {"participations": participations},
+        {"participations": participations, "now": now},
     )
 
 

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load tz humanize %}
+
+{% block title %}Messages | StockWars{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Messages</h1>
+      <div class="text-muted small">Private updates from the Stock-Wars team.</div>
+    </div>
+    <div class="small text-muted">
+      {% if page_obj.paginator.count %}
+        {{ page_obj.paginator.count }} message{{ page_obj.paginator.count|pluralize }}
+      {% else %}
+        No messages yet
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-body-tertiary d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="fw-semibold">Inbox</div>
+      <div class="small text-muted">Only you can see these messages.</div>
+    </div>
+    <div class="card-body p-0">
+      {% if deliveries %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th class="ps-3">Sent</th>
+                <th>Subject</th>
+                <th>From</th>
+                <th class="pe-3 text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in deliveries %}
+                <tr>
+                  <td class="ps-3">
+                    <div class="fw-semibold">{{ d.sent_at|localtime|date:"M j, Y" }}</div>
+                    <div class="small text-muted">{{ d.sent_at|localtime|time:"g:i A" }}</div>
+                  </td>
+                  <td>
+                    <div class="fw-semibold">{{ d.message.subject }}</div>
+                    <div class="small text-muted text-truncate" style="max-width: 520px;">
+                      {{ d.message.body|truncatechars:140 }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="fw-semibold">Admin</div>
+                  </td>
+                  <td class="pe-3 text-end">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary js-open-message"
+                      data-bs-toggle="modal"
+                      data-bs-target="#messageModal"
+                      data-subject="{{ d.message.subject|escapejs }}"
+                      data-sent="{{ d.sent_at|localtime|date:'M j, Y g:i A' }}"
+                      data-body="{{ d.message.body|escapejs }}"
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-3 text-muted">No messages yet.</div>
+      {% endif %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="card-footer bg-body d-flex justify-content-between align-items-center">
+        <div class="small text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+        <nav aria-label="Messages pagination">
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+              <a class="page-link" href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% else %}#{% endif %}">Prev</a>
+            </li>
+            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+              <a class="page-link" href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% else %}#{% endif %}">Next</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="modal fade" id="messageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title fw-semibold" id="messageModalTitle">Message</div>
+            <div class="small text-muted" id="messageModalMeta"></div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="text-muted small mb-2">From: <span class="fw-semibold text-body">Admin</span></div>
+          <div id="messageModalBody" style="white-space: pre-wrap;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      function $(id) { return document.getElementById(id); }
+      document.addEventListener("DOMContentLoaded", function () {
+        var title = $("messageModalTitle");
+        var meta = $("messageModalMeta");
+        var body = $("messageModalBody");
+        document.querySelectorAll(".js-open-message").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            if (title) title.textContent = btn.getAttribute("data-subject") || "Message";
+            if (meta) meta.textContent = "Sent: " + (btn.getAttribute("data-sent") || "—");
+            if (body) body.textContent = btn.getAttribute("data-body") || "";
+          });
+        });
+      });
+    })();
+  </script>
+{% endblock %}
+
