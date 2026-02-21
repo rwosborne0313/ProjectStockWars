@@ -82,6 +82,29 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Reverse proxy (nginx) / HTTPS settings:
+# Nginx terminates TLS and forwards to Daphne over a unix socket.
+# Tell Django to respect X-Forwarded-Proto so request.is_secure() is correct.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+# CSRF origin protection for HTTPS deployments behind a proxy.
+# If DJANGO_CSRF_TRUSTED_ORIGINS is not set, derive from allowed hosts.
+_csrf_trusted_raw = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").strip()
+if _csrf_trusted_raw:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_trusted_raw.split(",") if o.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = []
+    if not DEBUG:
+        for h in ALLOWED_HOSTS:
+            if h in {"localhost", "127.0.0.1"}:
+                continue
+            CSRF_TRUSTED_ORIGINS.append(f"https://{h}")
+
+if not DEBUG:
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+
 
 # Application definition
 
