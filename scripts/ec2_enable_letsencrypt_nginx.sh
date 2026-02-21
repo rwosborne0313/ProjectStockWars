@@ -8,6 +8,7 @@ set -euo pipefail
 #
 # Notes:
 # - Assumes cert already exists (e.g. created via certbot certonly --standalone).
+# - Optionally pulls latest repo changes first (git-based deploy workflow).
 # - Updates /etc/nginx/sites-available/stockwars in-place (creates a .bak backup).
 #
 
@@ -15,6 +16,16 @@ DOMAIN="${1:-}"
 if [[ -z "${DOMAIN}" ]]; then
   echo "Usage: sudo bash scripts/ec2_enable_letsencrypt_nginx.sh <domain>"
   exit 2
+fi
+
+APP_DIR="${APP_DIR:-/opt/stockwars/app}"
+APP_USER="${APP_USER:-stockwars}"
+
+echo "Updating repo (git pull) in ${APP_DIR} ..."
+if [[ -d "${APP_DIR}/.git" ]]; then
+  sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && git pull --ff-only"
+else
+  echo "WARN: ${APP_DIR} is not a git repo; skipping git pull."
 fi
 
 NGINX_SITE="${NGINX_SITE:-/etc/nginx/sites-available/stockwars}"
