@@ -76,6 +76,10 @@ DEBUG = _get_env_bool("DJANGO_DEBUG", default=True)
 # Twelve Data API key (used by REST + WebSocket proxy)
 TWELVE_DATA_API_KEY = os.environ.get("TWELVE_DATA_API_KEY", "")
 
+# War Stream WebSocket access control (default: allow in production).
+# If enabled, anonymous WebSocket connections will be closed.
+WAR_STREAM_REQUIRE_LOGIN = _get_env_bool("WAR_STREAM_REQUIRE_LOGIN", default=False)
+
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")

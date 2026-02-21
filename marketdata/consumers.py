@@ -26,10 +26,9 @@ class WarStreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         await self.accept()
 
-        # Optional: require login for access. In local/dev, allow anonymous access
-        # so the page works out-of-the-box.
+        # Optional: require login for access (configurable via settings/env).
         user = getattr(self.scope, "user", None)
-        if (not user or not user.is_authenticated) and not getattr(settings, "DEBUG", False):
+        if getattr(settings, "WAR_STREAM_REQUIRE_LOGIN", False) and (not user or not user.is_authenticated):
             await self.send_json({"type": "error", "error": "NOT_AUTHENTICATED"})
             await self.close(code=4401)
             return
