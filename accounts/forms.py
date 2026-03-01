@@ -7,7 +7,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.utils.safestring import mark_safe
 
-from .models import AgeBracket, ExperienceLevel, US_STATES
+from .models import US_STATES
 
 
 class SignupForm(UserCreationForm):
@@ -16,7 +16,7 @@ class SignupForm(UserCreationForm):
     first_name = forms.CharField(required=True, max_length=150)
     last_name = forms.CharField(required=True, max_length=150)
     address = forms.CharField(required=True, max_length=255)
-    address2 = forms.CharField(required=True, max_length=255, label="Address 2")
+    address2 = forms.CharField(required=False, max_length=255, label="Address 2")
     city = forms.CharField(required=True, max_length=120)
     state = forms.ChoiceField(required=True, choices=US_STATES)
     zip_code = forms.CharField(required=True, max_length=10, label="Zip Code")
@@ -29,8 +29,6 @@ class SignupForm(UserCreationForm):
         widget=forms.PasswordInput(render_value=False),
     )
     display_name = forms.CharField(max_length=32)
-    age_bracket = forms.ChoiceField(choices=AgeBracket.choices)
-    experience_level = forms.ChoiceField(choices=ExperienceLevel.choices)
     accept_terms = forms.BooleanField(
         required=True,
         label=mark_safe(
@@ -56,8 +54,6 @@ class SignupForm(UserCreationForm):
             "date_of_birth",
             "ssn",
             "display_name",
-            "age_bracket",
-            "experience_level",
         )
 
     def __init__(self, *args, **kwargs):
@@ -80,8 +76,6 @@ class SignupForm(UserCreationForm):
         self.fields["date_of_birth"].widget.attrs.update({"class": "form-control"})
         self.fields["ssn"].widget.attrs.update({"class": "form-control", "inputmode": "numeric"})
         self.fields["display_name"].widget.attrs.update({"class": "form-control"})
-        self.fields["age_bracket"].widget.attrs.update({"class": "form-select"})
-        self.fields["experience_level"].widget.attrs.update({"class": "form-select"})
         self.fields["password1"].widget.attrs.update(
             {"class": "form-control", "autocomplete": "new-password"}
         )
@@ -89,7 +83,7 @@ class SignupForm(UserCreationForm):
             {"class": "form-control", "autocomplete": "new-password"}
         )
 
-        self.fields["accept_terms"].widget.attrs.update({"class": "form-check-input"})
+        self.fields["accept_terms"].widget.attrs.update({"class": "form-check-input terms-checkbox-outline"})
 
     def clean(self):
         cleaned = super().clean()

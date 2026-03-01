@@ -74,6 +74,15 @@ def ops_execute_scheduled_basket_orders(modeladmin, request, queryset):
     modeladmin.message_user(request, msg, level=messages.SUCCESS)
 
 
+@admin.action(description="Ops: execute scheduled basket orders (include future competitions)")
+def ops_execute_scheduled_basket_orders_include_future(modeladmin, request, queryset):
+    if not _can_run_ops(request):
+        raise PermissionDenied
+    out = _run_command_and_capture("execute_scheduled_basket_orders", include_future=True)
+    msg = out.splitlines()[-1] if out else "execute_scheduled_basket_orders --include-future completed."
+    modeladmin.message_user(request, msg, level=messages.SUCCESS)
+
+
 @admin.action(description="Ops: market open sequence (activate queue → execute scheduled baskets)")
 def ops_market_open_sequence(modeladmin, request, queryset):
     if not _can_run_ops(request):
@@ -114,6 +123,7 @@ class CompetitionAdmin(admin.ModelAdmin):
         archive_competitions,
         ops_activate_queued_participants,
         ops_execute_scheduled_basket_orders,
+        ops_execute_scheduled_basket_orders_include_future,
         ops_market_open_sequence,
     )
     readonly_fields = ("allow_sell_short", "auto_close_processed_at")

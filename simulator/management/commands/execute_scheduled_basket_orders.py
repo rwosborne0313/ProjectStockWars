@@ -8,10 +8,12 @@ from django.utils import timezone
 
 from competitions.models import CompetitionStatus, ParticipantStatus
 from simulator.models import (
+    Order,
+    OrderStatus,
     ScheduledBasketOrder,
     ScheduledBasketOrderStatus,
 )
-from simulator.services import execute_basket_order
+from simulator.services import execute_basket_order, execute_order
 
 
 MAX_ATTEMPTS_DEFAULT = 3
@@ -27,15 +29,26 @@ class Command(BaseCommand):
             default=MAX_ATTEMPTS_DEFAULT,
             help="Max attempts before marking an order FAILED (default: 3).",
         )
+        parser.add_argument(
+            "--include-future",
+            action="store_true",
+            help=(
+                "Also execute pending scheduled basket orders for competitions that have not "
+                "started yet. Intended for explicit administrator-triggered/manual runs."
+            ),
+        )
 
     def handle(self, *args, **options):
         now = timezone.now()
         max_attempts = int(options.get("max_attempts") or MAX_ATTEMPTS_DEFAULT)
         max_attempts = max(1, min(max_attempts, 25))
+        include_future = bool(options.get("include_future"))
 
         executed = 0
         failed = 0
         skipped = 0
+        single_executed = 0
+        single_failed = 0
 
         # Process FIFO to keep it predictable for users.
         with transaction.atomic():
@@ -47,16 +60,20 @@ class Command(BaseCommand):
                     attempts__lt=max_attempts,
                     participant__status=ParticipantStatus.ACTIVE,
                     participant__competition__status=CompetitionStatus.PUBLISHED,
-                    participant__competition__week_start_at__lte=now,
-                    participant__competition__week_end_at__gte=now,
                 )
                 .order_by("created_at", "id")
             )
+            if include_future:
+                qs = qs.filter(participant__competition__week_end_at__gte=now)
+            else:
+                qs = qs.filter(
+                    participant__competition__week_start_at__lte=now,
+                    participant__competition__week_end_at__gte=now,
+                )
 
             orders = list(qs)
             if not orders:
                 self.stdout.write("No scheduled basket orders to execute.")
-                return
 
             for sbo in orders:
                 legs = list(sbo.legs.all().only("instrument_id", "pct"))
@@ -68,6 +85,7 @@ class Command(BaseCommand):
                     side=sbo.side,
                     total_amount=sbo.total_amount,
                     pct_by_instrument_id=pct_by_instrument_id,
+                    ignore_competition_window=include_future,
                 )
 
                 if result.ok:
@@ -89,7 +107,38 @@ class Command(BaseCommand):
                     skipped += 1
                 sbo.save(update_fields=["status", "attempts", "last_error"])
 
+        with transaction.atomic():
+            queued_orders = list(
+                Order.objects.select_for_update()
+                .select_related("participant", "participant__competition")
+                .filter(
+                    status=OrderStatus.SUBMITTED,
+                    reject_reason="QUEUED_PRESTART",
+                    participant__status=ParticipantStatus.ACTIVE,
+                    participant__competition__status=CompetitionStatus.PUBLISHED,
+                    participant__competition__week_start_at__lte=now,
+                    participant__competition__week_end_at__gte=now,
+                )
+                .order_by("created_at", "id")
+            )
+            for order in queued_orders:
+                result = execute_order(
+                    participant_id=order.participant_id,
+                    instrument_id=order.instrument_id,
+                    side=order.side,
+                    order_type=order.order_type,
+                    quantity=order.quantity,
+                    limit_price=order.limit_price,
+                    queued_order_id=order.id,
+                )
+                if result.ok:
+                    single_executed += 1
+                else:
+                    single_failed += 1
+
         self.stdout.write(
-            f"Executed {executed} scheduled basket order(s). Failed {failed}. Pending for retry {skipped}."
+            "Executed "
+            f"{executed} scheduled basket order(s). Failed {failed}. Pending for retry {skipped}. "
+            f"Executed {single_executed} queued single order(s). Failed {single_failed}."
         )
 

@@ -10,6 +10,25 @@ from marketdata.services import normalize_symbol
 from .models import OrderSide, OrderType
 from .models import OrderStatus
 
+RECENT_ORDER_TYPE_CHOICES = [
+    ("", "Any"),
+    (OrderType.MARKET, "Market"),
+    (OrderType.LIMIT, "Limit"),
+    ("BASKET", "Basket"),
+    ("BASKET_LEG", "Basket leg"),
+]
+
+RECENT_ORDER_STATUS_CHOICES = [
+    ("", "Any"),
+    (OrderStatus.SUBMITTED, "Submitted"),
+    (OrderStatus.FILLED, "Filled"),
+    (OrderStatus.REJECTED, "Rejected"),
+    (OrderStatus.CANCELLED, "Cancelled"),
+    ("PENDING", "Pending"),
+    ("EXECUTED", "Executed"),
+    ("FAILED", "Failed"),
+]
+
 
 class WatchlistCreateForm(forms.Form):
     name = forms.CharField(max_length=100)
@@ -174,7 +193,7 @@ class OrderSearchForm(forms.Form):
     )
     order_type = forms.ChoiceField(
         required=False,
-        choices=[("", "Any")] + list(OrderType.choices),
+        choices=RECENT_ORDER_TYPE_CHOICES,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     side = forms.ChoiceField(
@@ -189,7 +208,7 @@ class OrderSearchForm(forms.Form):
     )
     status = forms.ChoiceField(
         required=False,
-        choices=[("", "Any")] + list(OrderStatus.choices),
+        choices=RECENT_ORDER_STATUS_CHOICES,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     price = forms.DecimalField(

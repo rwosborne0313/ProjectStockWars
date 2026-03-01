@@ -651,28 +651,55 @@
                     <th class="text-end">Limit</th>
                     <th>Status</th>
                     <th class="text-end pe-3">Price</th>
+                    <th class="text-end pe-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {% for o in recent_orders %}
                     <tr
                       data-date="{{ o.created_at|localtime|date:'Y-m-d' }}"
-                      data-symbol="{{ o.instrument.symbol|upper }}"
+                      data-symbol="{{ o.symbol|upper }}"
                       data-order-type="{{ o.order_type }}"
                       data-side="{{ o.side }}"
-                      data-qty="{{ o.quantity }}"
+                      data-qty="{% if o.quantity %}{{ o.quantity }}{% endif %}"
                       data-status="{{ o.status }}"
                       data-submitted-price="{% if o.submitted_price %}{{ o.submitted_price|floatformat:2 }}{% endif %}"
                       data-limit-price="{% if o.limit_price %}{{ o.limit_price|floatformat:2 }}{% endif %}"
                     >
                       <td class="small text-muted ps-3">{{ o.created_at|localtime }}</td>
-                      <td class="fw-semibold">{{ o.instrument.symbol }}</td>
+                      <td class="fw-semibold">{{ o.symbol }}</td>
                       <td>{{ o.order_type }}</td>
                       <td>{{ o.side }}</td>
-                      <td class="text-end">{{ o.quantity }}</td>
+                      <td class="text-end">{% if o.quantity %}{{ o.quantity }}{% else %}-{% endif %}</td>
                       <td class="text-end">{% if o.limit_price %}{{ o.limit_price|floatformat:2 }}{% else %}-{% endif %}</td>
                       <td>{{ o.status }}</td>
                       <td class="text-end pe-3">${% if o.submitted_price %}{{ o.submitted_price|floatformat:2 }}{% else %}-{% endif %}</td>
+                      <td class="text-end pe-3">
+                        {% if o.order_type == "BASKET" and o.status == "PENDING" and o.scheduled_order_id %}
+                          <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="basket_cancel_scheduled">
+                            <input type="hidden" name="scheduled_order_id" value="{{ o.scheduled_order_id }}">
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-outline-danger js-cancel-scheduled-order"
+                              data-bs-toggle="modal"
+                              data-bs-target="#cancelScheduledBasketModal"
+                              data-order-id="{{ o.scheduled_order_id }}"
+                              data-basket-name="{{ o.basket_name }}"
+                              data-side="{{ o.side }}"
+                              data-total-amount="{% if o.total_amount %}{{ o.total_amount|floatformat:2 }}{% endif %}"
+                              data-created-at="{{ o.created_at|localtime }}"
+                              data-status="{{ o.status }}"
+                              data-leg-summary="{{ o.basket_leg_summary }}"
+                            >
+                              Cancel
+                            </button>
+                          </form>
+                        {% else %}
+                          -
+                        {% endif %}
+                      </td>
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -716,6 +743,35 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-danger" id="confirmClosePositionBtn">Sell</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="cancelScheduledBasketModal" tabindex="-1" aria-labelledby="cancelScheduledBasketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="cancelScheduledBasketModalLabel">Cancel scheduled basket order</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">
+            You are about to cancel this scheduled basket order:
+          </div>
+          <ul class="mb-0">
+            <li><span class="text-muted">Order ID:</span> <span class="fw-semibold" id="cancelScheduledOrderId">—</span></li>
+            <li><span class="text-muted">Basket:</span> <span class="fw-semibold" id="cancelScheduledBasketName">—</span></li>
+            <li><span class="text-muted">Side:</span> <span class="fw-semibold" id="cancelScheduledSide">—</span></li>
+            <li><span class="text-muted">Total amount:</span> <span class="fw-semibold" id="cancelScheduledTotalAmount">—</span></li>
+            <li><span class="text-muted">Placed:</span> <span class="fw-semibold" id="cancelScheduledPlacedAt">—</span></li>
+            <li><span class="text-muted">Status:</span> <span class="fw-semibold" id="cancelScheduledStatus">—</span></li>
+            <li><span class="text-muted">Legs:</span> <span class="fw-semibold" id="cancelScheduledLegSummary">—</span></li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep order</button>
+          <button type="button" class="btn btn-danger" id="confirmCancelScheduledBasketBtn">Confirm cancel</button>
         </div>
       </div>
     </div>
@@ -1128,6 +1184,47 @@
           confirmBtn.addEventListener("click", function () {
             if (pendingCloseForm) {
               pendingCloseForm.submit();
+            }
+          });
+        }
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var pendingCancelForm = null;
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var orderIdEl = document.getElementById("cancelScheduledOrderId");
+        var basketNameEl = document.getElementById("cancelScheduledBasketName");
+        var sideEl = document.getElementById("cancelScheduledSide");
+        var totalAmountEl = document.getElementById("cancelScheduledTotalAmount");
+        var placedAtEl = document.getElementById("cancelScheduledPlacedAt");
+        var statusEl = document.getElementById("cancelScheduledStatus");
+        var legSummaryEl = document.getElementById("cancelScheduledLegSummary");
+
+        document.querySelectorAll(".js-cancel-scheduled-order").forEach(function (btn) {
+          btn.addEventListener("click", function (e) {
+            pendingCancelForm = e.target.closest("form");
+            if (orderIdEl) orderIdEl.textContent = btn.getAttribute("data-order-id") || "—";
+            if (basketNameEl) basketNameEl.textContent = btn.getAttribute("data-basket-name") || "—";
+            if (sideEl) sideEl.textContent = btn.getAttribute("data-side") || "—";
+            if (totalAmountEl) {
+              var amount = btn.getAttribute("data-total-amount");
+              totalAmountEl.textContent = amount ? ("$" + amount) : "—";
+            }
+            if (placedAtEl) placedAtEl.textContent = btn.getAttribute("data-created-at") || "—";
+            if (statusEl) statusEl.textContent = btn.getAttribute("data-status") || "—";
+            if (legSummaryEl) legSummaryEl.textContent = btn.getAttribute("data-leg-summary") || "—";
+          });
+        });
+
+        var confirmBtn = document.getElementById("confirmCancelScheduledBasketBtn");
+        if (confirmBtn) {
+          confirmBtn.addEventListener("click", function () {
+            if (pendingCancelForm) {
+              pendingCancelForm.submit();
             }
           });
         }

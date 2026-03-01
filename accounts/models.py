@@ -82,7 +82,7 @@ class InvestorProfile(models.Model):
     experience_level = models.CharField(max_length=16, choices=ExperienceLevel.choices)
     display_name = models.CharField(max_length=32, unique=True)
 
-    # KYC / account profile fields (required at signup, nullable for legacy rows)
+    # KYC / account profile fields (nullable for legacy rows; address2 is optional)
     first_name = models.CharField(max_length=150, blank=True, null=True)
     last_name = models.CharField(max_length=150, blank=True, null=True)
     address = models.CharField(max_length=255, blank=True, null=True)

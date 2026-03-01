@@ -91,6 +91,7 @@ def execute_basket_order(
     side: str,
     total_amount: Decimal,
     pct_by_instrument_id: dict[int, Decimal],
+    ignore_competition_window: bool = False,
 ) -> BasketExecutionResult:
     """
     Execute a basket BUY or SELL as a set of immediate MARKET fills (one per symbol).
@@ -165,10 +166,14 @@ def execute_basket_order(
                 meta={"reason": "PARTICIPANT_NOT_ACTIVE"},
             )
 
-        # Competition must be within trading window and published.
+        # Competition must be within trading window and published unless explicitly bypassed
+        # by an administrator-triggered/manual execution path.
         if (
             participant.competition.status != CompetitionStatus.PUBLISHED
-            or not (participant.competition.week_start_at <= now <= participant.competition.week_end_at)
+            or (
+                not ignore_competition_window
+                and not (participant.competition.week_start_at <= now <= participant.competition.week_end_at)
+            )
         ):
             return BasketExecutionResult(
                 ok=False,
@@ -516,12 +521,68 @@ def execute_order(
     order_type: str,
     quantity: int,
     limit_price: Decimal | None = None,
+    queued_order_id: int | None = None,
 ) -> OrderExecutionResult:
     """
     Execute a MARKET or marketable LIMIT order immediately at the latest cached quote price.
     Non-marketable LIMIT orders are rejected immediately (no OPEN state in MVP).
     """
     now = timezone.now()
+    queued_order = None
+    if queued_order_id is not None:
+        queued_order = Order.objects.filter(id=queued_order_id, participant_id=participant_id).first()
+
+    def _persist_order(
+        *,
+        participant=None,
+        status: str,
+        submitted_price: Decimal | None = None,
+        quote_as_of=None,
+        reject_reason: str = "",
+    ) -> Order:
+        if queued_order is not None:
+            queued_order.participant = participant or queued_order.participant
+            queued_order.instrument_id = instrument_id
+            queued_order.side = side
+            queued_order.order_type = order_type
+            queued_order.quantity = quantity
+            queued_order.limit_price = limit_price
+            queued_order.status = status
+            queued_order.submitted_price = submitted_price
+            queued_order.quote_as_of = quote_as_of
+            queued_order.reject_reason = reject_reason
+            queued_order.save(
+                update_fields=[
+                    "participant",
+                    "instrument",
+                    "side",
+                    "order_type",
+                    "quantity",
+                    "limit_price",
+                    "status",
+                    "submitted_price",
+                    "quote_as_of",
+                    "reject_reason",
+                ]
+            )
+            return queued_order
+
+        create_kwargs = {
+            "instrument_id": instrument_id,
+            "side": side,
+            "order_type": order_type,
+            "quantity": quantity,
+            "limit_price": limit_price,
+            "status": status,
+            "submitted_price": submitted_price,
+            "quote_as_of": quote_as_of,
+            "reject_reason": reject_reason,
+        }
+        if participant is not None:
+            create_kwargs["participant"] = participant
+        else:
+            create_kwargs["participant_id"] = participant_id
+        return Order.objects.create(**create_kwargs)
 
     # Resolve instrument once (needed for on-demand refresh)
     try:
@@ -535,13 +596,7 @@ def execute_order(
     if order_type == OrderType.MARKET and inst is not None:
         refreshed = fetch_and_store_latest_quote(instrument=inst)
         if refreshed is None:
-            order = Order.objects.create(
-                participant_id=participant_id,
-                instrument_id=instrument_id,
-                side=side,
-                order_type=order_type,
-                quantity=quantity,
-                limit_price=limit_price,
+            order = _persist_order(
                 status=OrderStatus.REJECTED,
                 reject_reason="QUOTE_REFRESH_FAILED",
             )
@@ -564,13 +619,7 @@ def execute_order(
         if inst:
             latest_quote = fetch_and_store_latest_quote(instrument=inst)
     if not latest_quote:
-        order = Order.objects.create(
-            participant_id=participant_id,
-            instrument_id=instrument_id,
-            side=side,
-            order_type=order_type,
-            quantity=quantity,
-            limit_price=limit_price,
+        order = _persist_order(
             status=OrderStatus.REJECTED,
             reject_reason="NO_QUOTE_AVAILABLE",
         )
@@ -585,13 +634,7 @@ def execute_order(
             if refreshed:
                 latest_quote = refreshed
                 age_seconds = (now - latest_quote.as_of).total_seconds()
-        order = Order.objects.create(
-            participant_id=participant_id,
-            instrument_id=instrument_id,
-            side=side,
-            order_type=order_type,
-            quantity=quantity,
-            limit_price=limit_price,
+        order = _persist_order(
             status=OrderStatus.REJECTED,
             submitted_price=latest_quote.price,
             quote_as_of=latest_quote.as_of,
@@ -609,13 +652,7 @@ def execute_order(
     # Marketability check for LIMIT orders (immediate-fill-or-reject only)
     if order_type == OrderType.LIMIT:
         if limit_price is None:
-            order = Order.objects.create(
-                participant_id=participant_id,
-                instrument_id=instrument_id,
-                side=side,
-                order_type=order_type,
-                quantity=quantity,
-                limit_price=None,
+            order = _persist_order(
                 status=OrderStatus.REJECTED,
                 submitted_price=fill_price,
                 quote_as_of=latest_quote.as_of,
@@ -623,13 +660,7 @@ def execute_order(
             )
             return OrderExecutionResult(ok=False, order=order, fill=None, message="Limit price required.")
         if side == OrderSide.BUY and fill_price > limit_price:
-            order = Order.objects.create(
-                participant_id=participant_id,
-                instrument_id=instrument_id,
-                side=side,
-                order_type=order_type,
-                quantity=quantity,
-                limit_price=limit_price,
+            order = _persist_order(
                 status=OrderStatus.REJECTED,
                 submitted_price=fill_price,
                 quote_as_of=latest_quote.as_of,
@@ -637,13 +668,7 @@ def execute_order(
             )
             return OrderExecutionResult(ok=False, order=order, fill=None, message="Buy limit not marketable.")
         if side == OrderSide.SELL and fill_price < limit_price:
-            order = Order.objects.create(
-                participant_id=participant_id,
-                instrument_id=instrument_id,
-                side=side,
-                order_type=order_type,
-                quantity=quantity,
-                limit_price=limit_price,
+            order = _persist_order(
                 status=OrderStatus.REJECTED,
                 submitted_price=fill_price,
                 quote_as_of=latest_quote.as_of,
@@ -661,13 +686,8 @@ def execute_order(
         )
 
         if participant.status != ParticipantStatus.ACTIVE:
-            order = Order.objects.create(
+            order = _persist_order(
                 participant=participant,
-                instrument_id=instrument_id,
-                side=side,
-                order_type=order_type,
-                quantity=quantity,
-                limit_price=limit_price,
                 status=OrderStatus.REJECTED,
                 submitted_price=fill_price,
                 quote_as_of=latest_quote.as_of,
@@ -680,13 +700,8 @@ def execute_order(
             participant.competition.status != CompetitionStatus.PUBLISHED
             or not (participant.competition.week_start_at <= now <= participant.competition.week_end_at)
         ):
-            order = Order.objects.create(
+            order = _persist_order(
                 participant=participant,
-                instrument_id=instrument_id,
-                side=side,
-                order_type=order_type,
-                quantity=quantity,
-                limit_price=limit_price,
                 status=OrderStatus.REJECTED,
                 submitted_price=fill_price,
                 quote_as_of=latest_quote.as_of,
@@ -734,13 +749,8 @@ def execute_order(
                     participant=participant, quantity__gt=0
                 ).count()
                 if existing_qty <= 0 and positions_count >= int(competition.max_symbols):
-                    order = Order.objects.create(
+                    order = _persist_order(
                         participant=participant,
-                        instrument_id=instrument_id,
-                        side=side,
-                        order_type=order_type,
-                        quantity=quantity,
-                        limit_price=limit_price,
                         status=OrderStatus.REJECTED,
                         submitted_price=fill_price,
                         quote_as_of=latest_quote.as_of,
@@ -833,13 +843,8 @@ def execute_order(
                     else "POSITION_SIZE_LIMIT_MAX_PCT"
                 )
 
-                order = Order.objects.create(
+                order = _persist_order(
                     participant=participant,
-                    instrument_id=instrument_id,
-                    side=side,
-                    order_type=order_type,
-                    quantity=quantity,
-                    limit_price=limit_price,
                     status=OrderStatus.REJECTED,
                     submitted_price=fill_price,
                     quote_as_of=latest_quote.as_of,
@@ -873,13 +878,8 @@ def execute_order(
                 )
 
             if participant.cash_balance < notional:
-                order = Order.objects.create(
+                order = _persist_order(
                     participant=participant,
-                    instrument_id=instrument_id,
-                    side=side,
-                    order_type=order_type,
-                    quantity=quantity,
-                    limit_price=limit_price,
                     status=OrderStatus.REJECTED,
                     submitted_price=fill_price,
                     quote_as_of=latest_quote.as_of,
@@ -888,13 +888,8 @@ def execute_order(
                 return OrderExecutionResult(ok=False, order=order, fill=None, message="Insufficient cash.")
         else:
             if position.quantity < quantity:
-                order = Order.objects.create(
+                order = _persist_order(
                     participant=participant,
-                    instrument_id=instrument_id,
-                    side=side,
-                    order_type=order_type,
-                    quantity=quantity,
-                    limit_price=limit_price,
                     status=OrderStatus.REJECTED,
                     submitted_price=fill_price,
                     quote_as_of=latest_quote.as_of,
@@ -902,13 +897,8 @@ def execute_order(
                 )
                 return OrderExecutionResult(ok=False, order=order, fill=None, message="Insufficient shares.")
 
-        order = Order.objects.create(
+        order = _persist_order(
             participant=participant,
-            instrument_id=instrument_id,
-            side=side,
-            order_type=order_type,
-            quantity=quantity,
-            limit_price=limit_price,
             status=OrderStatus.FILLED,
             submitted_price=fill_price,
             quote_as_of=latest_quote.as_of,

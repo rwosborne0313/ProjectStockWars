@@ -1,12 +1,12 @@
 from decimal import Decimal
-from datetime import datetime, time, timezone as py_timezone, timedelta
+from datetime import timezone as py_timezone, timedelta
 from math import ceil
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.db.models import Q, Sum
+from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -36,8 +36,10 @@ from .models import (
     BasketItem,
     Order,
     OrderSide,
+    OrderStatus,
     OrderType,
     ScheduledBasketOrder,
+    ScheduledBasketOrderStatus,
     ScheduledBasketOrderLeg,
     TradeFill,
 )
@@ -102,11 +104,45 @@ def dashboard_for_competition(request, competition_id: int):
         return redirect("competitions:competition_detail", competition_id=competition_id)
 
     if request.method == "POST":
+        def _basket_changes_locked() -> bool:
+            seconds_until_start = (participant.competition.week_start_at - now).total_seconds()
+            return seconds_until_start <= 600
+
         def _ensure_default_watchlist() -> Watchlist:
             wl = Watchlist.objects.filter(user=request.user).order_by("id").first()
             if wl:
                 return wl
             return Watchlist.objects.create(user=request.user, name="My Watchlist", industry_label="")
+
+        if request.POST.get("action") == "basket_cancel_scheduled":
+            try:
+                scheduled_order_id = int(request.POST.get("scheduled_order_id") or 0)
+            except (TypeError, ValueError):
+                scheduled_order_id = 0
+            scheduled = ScheduledBasketOrder.objects.filter(
+                id=scheduled_order_id,
+                participant=participant,
+            ).first()
+            if not scheduled:
+                messages.error(request, "Scheduled basket order not found.")
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+            if scheduled.status != ScheduledBasketOrderStatus.PENDING:
+                messages.error(request, "Only pending scheduled basket orders can be cancelled.")
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+            if now >= participant.competition.week_start_at:
+                messages.error(request, "Cannot cancel basket orders after the competition starts.")
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+            if _basket_changes_locked():
+                messages.error(
+                    request,
+                    "Basket order changes are locked in the last 10 minutes before competition start.",
+                )
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
+            scheduled.status = ScheduledBasketOrderStatus.CANCELLED
+            scheduled.last_error = "Cancelled by user before start."
+            scheduled.save(update_fields=["status", "last_error"])
+            messages.success(request, "Scheduled basket order cancelled.")
+            return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
 
         if request.POST.get("action") == "basket_trade":
             try:
@@ -146,6 +182,12 @@ def dashboard_for_competition(request, competition_id: int):
 
             # If the competition hasn't started yet, save the basket order for execution at start.
             if now < participant.competition.week_start_at:
+                if _basket_changes_locked():
+                    messages.error(
+                        request,
+                        "Basket order changes are locked in the last 10 minutes before competition start.",
+                    )
+                    return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
                 competition = participant.competition
                 max_pct = (
                     Decimal(competition.max_single_symbol_pct)
@@ -307,6 +349,27 @@ def dashboard_for_competition(request, competition_id: int):
         form = TradeTicketForm(request.POST, participant=participant)
         if form.is_valid():
             instrument = get_or_create_instrument_by_symbol(form.cleaned_data["symbol"])
+            if now < participant.competition.week_start_at:
+                latest_quote = (
+                    Quote.objects.filter(instrument_id=instrument.id)
+                    .order_by("-as_of")
+                    .only("price", "as_of")
+                    .first()
+                )
+                Order.objects.create(
+                    participant=participant,
+                    instrument=instrument,
+                    side=form.cleaned_data["side"],
+                    order_type=form.cleaned_data["order_type"],
+                    quantity=form.cleaned_data["quantity"],
+                    limit_price=form.cleaned_data.get("limit_price"),
+                    status=OrderStatus.SUBMITTED,
+                    submitted_price=(latest_quote.price if latest_quote else None),
+                    quote_as_of=(latest_quote.as_of if latest_quote else None),
+                    reject_reason="QUEUED_PRESTART",
+                )
+                messages.success(request, "Order queued for execution at competition start.")
+                return redirect("simulator:dashboard_for_competition", competition_id=competition_id)
             result = execute_order(
                 participant_id=participant.id,
                 instrument_id=instrument.id,
@@ -390,42 +453,113 @@ def dashboard_for_competition(request, competition_id: int):
         else Decimal("0")
     )
 
-    recent_orders = (
+    recent_orders: list[dict] = []
+    order_rows = (
         Order.objects.filter(participant=participant)
         .select_related("instrument")
         .prefetch_related("fills")
     )
+    for o in order_rows:
+        recent_orders.append(
+            {
+                "created_at": o.created_at,
+                "scheduled_order_id": None,
+                "basket_name": None,
+                "total_amount": None,
+                "basket_leg_summary": "",
+                "symbol": o.instrument.symbol,
+                "order_type": o.order_type,
+                "side": o.side,
+                "quantity": o.quantity,
+                "limit_price": o.limit_price,
+                "status": o.status,
+                "submitted_price": o.submitted_price,
+                "fill_prices": [f.price for f in o.fills.all()],
+            }
+        )
+
+    scheduled_rows = (
+        ScheduledBasketOrder.objects.filter(participant=participant)
+        .prefetch_related("legs__instrument")
+        .order_by("-created_at")
+    )
+    for sbo in scheduled_rows:
+        leg_summary = ", ".join(
+            f"{leg.instrument.symbol} {leg.pct:.2f}%"
+            for leg in sorted(sbo.legs.all(), key=lambda l: l.instrument.symbol)
+        )
+        recent_orders.append(
+            {
+                "created_at": sbo.created_at,
+                "scheduled_order_id": sbo.id,
+                "basket_name": sbo.basket_name,
+                "total_amount": sbo.total_amount,
+                "basket_leg_summary": leg_summary,
+                "symbol": "BASKET",
+                "order_type": "BASKET",
+                "side": sbo.side,
+                "quantity": None,
+                "limit_price": None,
+                "status": sbo.status,
+                "submitted_price": None,
+                "fill_prices": [],
+            }
+        )
+        for leg in sbo.legs.all():
+            recent_orders.append(
+                {
+                    "created_at": sbo.created_at,
+                    "scheduled_order_id": sbo.id,
+                    "basket_name": sbo.basket_name,
+                    "total_amount": sbo.total_amount,
+                    "basket_leg_summary": leg_summary,
+                    "symbol": leg.instrument.symbol,
+                    "order_type": "BASKET_LEG",
+                    "side": sbo.side,
+                    "quantity": None,
+                    "limit_price": None,
+                    "status": sbo.status,
+                    "submitted_price": None,
+                    "fill_prices": [],
+                }
+            )
 
     order_search_form = OrderSearchForm(request.GET or None)
     if order_search_form.is_valid():
         cd = order_search_form.cleaned_data
 
-        if cd.get("placed_date"):
-            tz = timezone.get_current_timezone()
-            start_local = datetime.combine(cd["placed_date"], time.min, tzinfo=tz)
-            end_local = datetime.combine(cd["placed_date"], time.max, tzinfo=tz)
-            start_utc = start_local.astimezone(py_timezone.utc)
-            end_utc = end_local.astimezone(py_timezone.utc)
-            recent_orders = recent_orders.filter(created_at__gte=start_utc, created_at__lte=end_utc)
+        def _price_match(row: dict, target: Decimal) -> bool:
+            if row.get("submitted_price") == target or row.get("limit_price") == target:
+                return True
+            for p in row.get("fill_prices") or []:
+                if p == target:
+                    return True
+            return False
 
-        if cd.get("symbol"):
-            recent_orders = recent_orders.filter(instrument__symbol__iexact=cd["symbol"])
-        if cd.get("order_type"):
-            recent_orders = recent_orders.filter(order_type=cd["order_type"])
-        if cd.get("side"):
-            recent_orders = recent_orders.filter(side=cd["side"])
-        if cd.get("quantity"):
-            recent_orders = recent_orders.filter(quantity=cd["quantity"])
-        if cd.get("status"):
-            recent_orders = recent_orders.filter(status=cd["status"])
-        if cd.get("price") is not None:
-            recent_orders = recent_orders.filter(
-                Q(submitted_price=cd["price"]) | Q(limit_price=cd["price"]) | Q(fills__price=cd["price"])
-            ).distinct()
+        filtered_rows = []
+        placed_date = cd.get("placed_date")
+        symbol = (cd.get("symbol") or "").upper()
+        for row in recent_orders:
+            if placed_date:
+                if timezone.localtime(row["created_at"]).date() != placed_date:
+                    continue
+            if symbol and row["symbol"].upper() != symbol:
+                continue
+            if cd.get("order_type") and row["order_type"] != cd["order_type"]:
+                continue
+            if cd.get("side") and row["side"] != cd["side"]:
+                continue
+            if cd.get("quantity") and row.get("quantity") != cd["quantity"]:
+                continue
+            if cd.get("status") and row["status"] != cd["status"]:
+                continue
+            if cd.get("price") is not None and not _price_match(row, cd["price"]):
+                continue
+            filtered_rows.append(row)
+        recent_orders = filtered_rows
 
-        recent_orders = recent_orders.order_by("-created_at")[:200]
-    else:
-        recent_orders = recent_orders.order_by("-created_at")[:50]
+    recent_orders = sorted(recent_orders, key=lambda r: r["created_at"], reverse=True)
+    recent_orders = recent_orders[:200] if order_search_form.is_valid() else recent_orders[:50]
 
     # Realized P&L: sum realized_pnl of SELL fills
     realized_total = (

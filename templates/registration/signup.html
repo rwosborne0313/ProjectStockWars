@@ -17,40 +17,40 @@
 
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
+              <label class="form-label required-label" for="{{ form.username.id_for_label }}">Username</label>
               {{ form.username }}
               {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.display_name.id_for_label }}">Display name</label>
+              <label class="form-label required-label" for="{{ form.display_name.id_for_label }}">Screen name</label>
               {{ form.display_name }}
               {% if form.display_name.errors %}<div class="text-danger small">{{ form.display_name.errors }}</div>{% endif %}
             </div>
 
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+              <label class="form-label required-label" for="{{ form.email.id_for_label }}">Email</label>
               {{ form.email }}
               {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.email_confirm.id_for_label }}">Confirm email</label>
+              <label class="form-label required-label" for="{{ form.email_confirm.id_for_label }}">Confirm email</label>
               {{ form.email_confirm }}
               {% if form.email_confirm.errors %}<div class="text-danger small">{{ form.email_confirm.errors }}</div>{% endif %}
             </div>
 
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.first_name.id_for_label }}">First name</label>
+              <label class="form-label required-label" for="{{ form.first_name.id_for_label }}">First name</label>
               {{ form.first_name }}
               {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.last_name.id_for_label }}">Last name</label>
+              <label class="form-label required-label" for="{{ form.last_name.id_for_label }}">Last name</label>
               {{ form.last_name }}
               {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors }}</div>{% endif %}
             </div>
 
             <div class="col-12">
-              <label class="form-label" for="{{ form.address.id_for_label }}">Address</label>
+              <label class="form-label required-label" for="{{ form.address.id_for_label }}">Address</label>
               {{ form.address }}
               {% if form.address.errors %}<div class="text-danger small">{{ form.address.errors }}</div>{% endif %}
             </div>
@@ -61,35 +61,35 @@
             </div>
 
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.city.id_for_label }}">City</label>
+              <label class="form-label required-label" for="{{ form.city.id_for_label }}">City</label>
               {{ form.city }}
               {% if form.city.errors %}<div class="text-danger small">{{ form.city.errors }}</div>{% endif %}
             </div>
             <div class="col-md-3">
-              <label class="form-label" for="{{ form.state.id_for_label }}">State</label>
+              <label class="form-label required-label" for="{{ form.state.id_for_label }}">State</label>
               {{ form.state }}
               {% if form.state.errors %}<div class="text-danger small">{{ form.state.errors }}</div>{% endif %}
             </div>
             <div class="col-md-3">
-              <label class="form-label" for="{{ form.zip_code.id_for_label }}">Zip Code</label>
+              <label class="form-label required-label" for="{{ form.zip_code.id_for_label }}">Zip Code</label>
               {{ form.zip_code }}
               {% if form.zip_code.errors %}<div class="text-danger small">{{ form.zip_code.errors }}</div>{% endif %}
             </div>
 
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.phone.id_for_label }}">Phone</label>
+              <label class="form-label required-label" for="{{ form.phone.id_for_label }}">Phone</label>
               {{ form.phone }}
               {% if form.phone.errors %}<div class="text-danger small">{{ form.phone.errors }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.date_of_birth.id_for_label }}">Date of Birth</label>
+              <label class="form-label required-label" for="{{ form.date_of_birth.id_for_label }}">Date of Birth</label>
               {{ form.date_of_birth }}
               {% if form.date_of_birth.errors %}<div class="text-danger small">{{ form.date_of_birth.errors }}</div>{% endif %}
             </div>
 
             <div class="col-md-6">
               <label class="form-label d-flex align-items-center gap-2" for="{{ form.ssn.id_for_label }}">
-                <span>SSN</span>
+                <span>SSN <span class="text-danger">*</span></span>
                 <button
                   type="button"
                   class="btn btn-sm btn-outline-secondary py-0 px-2"
@@ -119,23 +119,12 @@
             </div>
 
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.age_bracket.id_for_label }}">Age bracket</label>
-              {{ form.age_bracket }}
-              {% if form.age_bracket.errors %}<div class="text-danger small">{{ form.age_bracket.errors }}</div>{% endif %}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label" for="{{ form.experience_level.id_for_label }}">Experience level</label>
-              {{ form.experience_level }}
-              {% if form.experience_level.errors %}<div class="text-danger small">{{ form.experience_level.errors }}</div>{% endif %}
-            </div>
-
-            <div class="col-md-6">
-              <label class="form-label" for="{{ form.password1.id_for_label }}">Password</label>
+              <label class="form-label required-label" for="{{ form.password1.id_for_label }}">Password</label>
               {{ form.password1 }}
               {% if form.password1.errors %}<div class="text-danger small">{{ form.password1.errors }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-              <label class="form-label" for="{{ form.password2.id_for_label }}">Confirm password</label>
+              <label class="form-label required-label" for="{{ form.password2.id_for_label }}">Confirm password</label>
               {{ form.password2 }}
               {% if form.password2.errors %}<div class="text-danger small">{{ form.password2.errors }}</div>{% endif %}
             </div>
@@ -144,7 +133,7 @@
               <div class="form-check">
                 {{ form.accept_terms }}
                 <label class="form-check-label" for="{{ form.accept_terms.id_for_label }}">
-                  {{ form.accept_terms.label|safe }}
+                  {{ form.accept_terms.label|safe }} <span class="text-danger">*</span>
                 </label>
               </div>
               {% if form.accept_terms.errors %}<div class="text-danger small">{{ form.accept_terms.errors }}</div>{% endif %}
@@ -160,6 +149,22 @@
   </div>
 
   <style>
+    .required-label::after {
+      content: " *";
+      color: #dc3545;
+      font-weight: 700;
+    }
+
+    .terms-checkbox-outline {
+      border: 2px solid #6c757d;
+      border-radius: 0.25rem;
+    }
+
+    .terms-checkbox-outline:focus {
+      box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+      border-color: #dc3545;
+    }
+
     /* Wider tooltip for long SSN explanation */
     .ssn-tooltip .tooltip-inner {
       max-width: 520px;
